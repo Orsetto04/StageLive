@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "832068827528",
+    "project_id": "stagelive-d3d25",
+    "storage_bucket": "stagelive-d3d25.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:832068827528:android:d57a60d66e924c600ca23d",
+        "android_client_info": {
+          "package_name": "com.example.stagelive"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "832068827528-rdrrtlse2ja5ntpnj5bruc75cb76kfrh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUr43Yfk3P9XzqYQloYjzO7JTiyZTHpp8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "832068827528-rdrrtlse2ja5ntpnj5bruc75cb76kfrh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
