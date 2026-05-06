@@ -24,13 +24,16 @@ class _LoginViewState extends State<LoginView> {
     }
 
     try {
-      // Chiamata al metodo corretto del tuo AuthService: loginUtente
-      await _auth.loginUtente(email, password);
+    
+await _auth.loginUtente(
+  email: email, 
+  password: password
+);
 
       // Se non lancia eccezioni, l'accesso è riuscito
       if (mounted) {
         _showFeedback("Accesso all'Arena eseguito con successo!", isError: false);
-        // Navigator.pushReplacementNamed(context, '/home'); // Sblocca quando hai la home
+        Navigator.pushReplacementNamed(context, '/events');
       }
     } catch (e) {
       // Gestione errori (es: utente non trovato, password errata)

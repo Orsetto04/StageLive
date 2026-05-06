@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:stagelive/ui/auth/login_view.dart';
-
+import 'package:stagelive/ui/auth/EventsView.dart';
+import 'package:stagelive/ui/auth/login_view.dart'; 
+import 'package:stagelive/ui/auth/CreateEventView.dart';
 // 1. ASSICURATI CHE QUESTI NOMI SIANO IDENTICI AI TUOI FILE
 import 'package:stagelive/ui/auth/register_view.dart';
 
@@ -31,10 +32,12 @@ class StageLiveApp extends StatelessWidget {
       // la classe si chiami esattamente "class LoginView extends..."
       home: LoginView(),
 
-      routes: {
-        '/login': (context) => LoginView(),
-        '/register': (context) => RegisterView(),
-      },
+    routes: {
+      '/login': (context) => LoginView(),
+      '/register': (context) => RegisterView(),
+      '/events': (context) => EventsView(), 
+     '/create-event': (context) => CreateEventView(),
+    },
     );
   }
 }
