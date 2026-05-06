@@ -1,92 +1,78 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
 
-class RegisterView extends StatefulWidget {
-  final String role;
-  const RegisterView({super.key, required this.role});
-
-  @override
-  State<RegisterView> createState() => _RegisterViewState();
-}
-
-class _RegisterViewState extends State<RegisterView> {
-  final AuthService _authService = AuthService();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-
-  void _mostraErrore(String messaggio) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        messaggio, 
-        style: const TextStyle(color: Colors.white), 
-      ),
-      backgroundColor: const Color(0xFFD18BFF).withOpacity(0.8), // Stesso viola dell'Arena
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      duration: const Duration(seconds: 3),
-    ),
-  );
-}
-
+class RegisterView extends StatelessWidget {
+  final _nomeController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passController = TextEditingController();
+  final _confirmController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0B1E),
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, iconTheme: const IconThemeData(color: Colors.white)),
+      backgroundColor: Color(0xFF0B0B0F),
+      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, title: Text("STAGELIVE", style: TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold, fontSize: 14))),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(30.0),
+          padding: EdgeInsets.all(30.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Crea il tuo Account", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              Text("Unisciti alla community di StageLive come ${widget.role}.", style: const TextStyle(color: Colors.white54, fontSize: 16)),
-              const SizedBox(height: 40),
+              Text("Il tuo posto in prima fila è qui.", style: TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold, height: 1.1)),
+              SizedBox(height: 40),
               
-              _label("NOME COMPLETO"),
-              _input(_nameController, "Mario Rossi", Icons.person_outline),
-              const SizedBox(height: 20),
-              _label("EMAIL"),
-              _input(_emailController, "mario@esempio.it", Icons.email_outlined),
-              const SizedBox(height: 20),
-              _label("PASSWORD"),
-              _input(_passwordController, "••••••••", Icons.lock_outline, isPass: true),
-              
-              const SizedBox(height: 40),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD18BFF),
-                  minimumSize: const Size(double.infinity, 60),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              Container(
+                padding: EdgeInsets.all(25),
+                decoration: BoxDecoration(
+                  color: Color(0xFF16161E),
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(color: Colors.white10)
                 ),
-                onPressed: () async {
-  if (_nameController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
-    _mostraErrore("Riempi tutti i campi");
-    return;
-  }
-
-  // Chiamata alla nuova funzione passandogli widget.role
-  bool success = await _authService.registerUser(
-    email: _emailController.text.trim(),
-    password: _passwordController.text.trim(),
-    name: _nameController.text.trim(),
-    role: widget.role, // <--- Passa "Pubblico" o "Performer" automaticamente
-  );
-
-  if (success) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Registrazione completata con successo!")),
-    );
-    Navigator.pop(context);
-  } else {
-    _mostraErrore("Errore nella registrazione");
-  }
-},
-                child: const Text("Registrati", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Crea il tuo Account", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 20),
+                    
+                    _buildSmallLabel("NOME COMPLETO"),
+                    _buildInput(_nomeController, "Mario Rossi", Icons.person_outline),
+                    
+                    SizedBox(height: 15),
+                    _buildSmallLabel("EMAIL"),
+                    _buildInput(_emailController, "mario@esempio.it", Icons.email_outlined),
+                    
+                    SizedBox(height: 15),
+                    Row(
+                      children: [
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSmallLabel("PASSWORD"),
+                            _buildInput(_passController, "•••••", Icons.lock_outline, isPass: true),
+                          ],
+                        )),
+                        SizedBox(width: 10),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSmallLabel("CONFERMA"),
+                            _buildInput(_confirmController, "•••••", Icons.history, isPass: true),
+                          ],
+                        )),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 30),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFFD68BFF),
+                        minimumSize: Size(double.infinity, 55),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                      ),
+                      onPressed: () { /* Logica Registrazione */ },
+                      child: Text("Registrati", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -95,19 +81,26 @@ class _RegisterViewState extends State<RegisterView> {
     );
   }
 
-  Widget _label(String text) => Text(text, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1));
-  
-  Widget _input(TextEditingController controller, String hint, IconData icon, {bool isPass = false}) {
+  Widget _buildSmallLabel(String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 5, left: 4),
+      child: Text(text, style: TextStyle(color: Colors.grey[500], fontSize: 10, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildInput(TextEditingController controller, String hint, IconData icon, {bool isPass = false}) {
     return TextField(
       controller: controller,
       obscureText: isPass,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: Colors.white, fontSize: 14),
       decoration: InputDecoration(
+        prefixIcon: Icon(icon, color: Colors.grey, size: 18),
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white24),
-        prefixIcon: Icon(icon, color: Colors.white54),
-        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white12)),
-        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFD18BFF))),
+        hintStyle: TextStyle(color: Colors.white10),
+        filled: true,
+        fillColor: Colors.black,
+        contentPadding: EdgeInsets.symmetric(vertical: 15),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
       ),
     );
   }

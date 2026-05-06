@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // Importante!
-import 'ui/auth/login_view.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:stagelive/ui/auth/login_view.dart';
+
+// 1. ASSICURATI CHE QUESTI NOMI SIANO IDENTICI AI TUOI FILE
+import 'package:stagelive/ui/auth/register_view.dart';
+
 
 void main() async {
-  // 1. Assicura che i widget siano pronti
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 2. Inizializza Firebase prima di far partire l'app
   await Firebase.initializeApp();
-  
-  runApp(const MyApp());
+  runApp(const StageLiveApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class StageLiveApp extends StatelessWidget {
+  const StageLiveApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -22,9 +22,19 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: const Color(0xFFBC00DD),
+        // Colore viola neon dei tuoi mockup
+        primaryColor: const Color(0xFFD68BFF),
+        scaffoldBackgroundColor: const Color(0xFF0B0B0F),
       ),
-      home: const LoginView(),
+      
+      // 2. SE DA ERRORE QUI: Controlla che nel file login_view.dart 
+      // la classe si chiami esattamente "class LoginView extends..."
+      home: LoginView(),
+
+      routes: {
+        '/login': (context) => LoginView(),
+        '/register': (context) => RegisterView(),
+      },
     );
   }
 }
