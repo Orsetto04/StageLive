@@ -1,13 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:stagelive/services/auth_service.dart';
 
-class LoginView extends StatelessWidget {
+class LoginView extends StatefulWidget {
+  @override
+  State<LoginView> createState() => _LoginViewState();
+}
+
+class _LoginViewState extends State<LoginView> {
   final _emailController = TextEditingController();
   final _passController = TextEditingController();
+  
+  // Istanza del servizio di autenticazione
+  final AuthService _auth = AuthService();
+
+  // Logica di accesso AGGIORNATA
+  void _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showFeedback("Inserisci email e password", isError: true);
+      return;
+    }
+
+    try {
+      // Chiamata al metodo corretto del tuo AuthService: loginUtente
+      await _auth.loginUtente(email, password);
+
+      // Se non lancia eccezioni, l'accesso è riuscito
+      if (mounted) {
+        _showFeedback("Accesso all'Arena eseguito con successo!", isError: false);
+        // Navigator.pushReplacementNamed(context, '/home'); // Sblocca quando hai la home
+      }
+    } catch (e) {
+      // Gestione errori (es: utente non trovato, password errata)
+      if (mounted) {
+        _showFeedback("Credenziali errate o errore di connessione.", isError: true);
+      }
+    }
+  }
+
+  // Funzione per mostrare label di successo o errore
+  void _showFeedback(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: isError ? Colors.redAccent : Color(0xFFD68BFF),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF0B0B0F), // Sfondo scuro foto
+      backgroundColor: Color(0xFF0B0B0F), 
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 30.0),
@@ -15,7 +64,6 @@ class LoginView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 80),
-              // Badge "Join the evolution"
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -31,7 +79,6 @@ class LoginView extends StatelessWidget {
               
               SizedBox(height: 50),
               
-              // Box Login (Stile Foto 1)
               Container(
                 padding: EdgeInsets.all(25),
                 decoration: BoxDecoration(
@@ -50,7 +97,6 @@ class LoginView extends StatelessWidget {
                     
                     SizedBox(height: 30),
                     
-                    // Bottone Accedi (Viola Brillante)
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Color(0xFFD68BFF),
@@ -59,7 +105,7 @@ class LoginView extends StatelessWidget {
                         elevation: 10,
                         shadowColor: Color(0xFFD68BFF).withOpacity(0.4),
                       ),
-                      onPressed: () { /* Logica Login */ },
+                      onPressed: _handleLogin, 
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

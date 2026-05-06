@@ -1,16 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:stagelive/services/auth_service.dart';
 
-class RegisterView extends StatelessWidget {
+class RegisterView extends StatefulWidget {
+  @override
+  State<RegisterView> createState() => _RegisterViewState();
+}
+
+class _RegisterViewState extends State<RegisterView> {
   final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
   final _passController = TextEditingController();
   final _confirmController = TextEditingController();
+  
+  final AuthService _auth = AuthService();
+
+  // Logica di registrazione AGGIORNATA
+  void _handleRegister() async {
+    String nome = _nomeController.text.trim();
+    String email = _emailController.text.trim();
+    String password = _passController.text.trim();
+    String confirm = _confirmController.text.trim();
+
+    // Validazione base
+    if (nome.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Compila tutti i campi")),
+      );
+      return;
+    }
+
+    if (password != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Le password non coincidono")),
+      );
+      return;
+    }
+
+    try {
+      // Usiamo il metodo corretto del tuo AuthService: registraUtente
+      await _auth.registraUtente(
+        email: email, 
+        password: password, 
+        nome: nome
+      );
+
+      // Se non lancia eccezioni, il salvataggio su Firestore è riuscito
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Account creato con successo!")),
+        );
+        Navigator.pop(context); 
+      }
+    } catch (e) {
+      // Gestisce gli errori lanciati dal rethrow di AuthService
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Errore: ${e.toString()}")),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFF0B0B0F),
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, title: Text("STAGELIVE", style: TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold, fontSize: 14))),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent, 
+        elevation: 0, 
+        title: Text("STAGELIVE", style: TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold, fontSize: 14))
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.all(30.0),
@@ -68,7 +127,7 @@ class RegisterView extends StatelessWidget {
                         minimumSize: Size(double.infinity, 55),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                       ),
-                      onPressed: () { /* Logica Registrazione */ },
+                      onPressed: _handleRegister, 
                       child: Text("Registrati", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
                   ],
