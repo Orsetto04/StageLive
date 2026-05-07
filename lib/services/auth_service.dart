@@ -5,85 +5,89 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // 1. REGISTRAZIONE - Ora accetta parametri NOMINATI con {}
-  Future<User?> registraUtente({
-    required String email, 
-    required String password, 
-    String? nome
-  }) async {
-    try {
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email, 
-        password: password
-      );
-      User? user = result.user;
+  // Getter per ottenere l'ID utente corrente
+  String? get currentUid => _auth.currentUser?.uid;
 
-      if (user != null) {
-        await _firestore.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'nome': nome ?? 'Utente StageLive',
-          'email': email,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-      return user;
-    } catch (e) {
-      print("Errore Registrazione: $e");
-      rethrow;
-    }
+  // LOGIN
+  Future<User?> loginUtente({required String email, required String password}) async {
+    UserCredential res = await _auth.signInWithEmailAndPassword(email: email, password: password);
+    return res.user;
   }
 
-  // 2. LOGIN - Anche questo con parametri NOMINATI per coerenza
-  Future<User?> loginUtente({
-    required String email, 
-    required String password
-  }) async {
-    try {
-      UserCredential result = await _auth.signInWithEmailAndPassword(
-        email: email, 
-        password: password
-      );
-      return result.user;
-    } catch (e) {
-      print("Errore Login: $e");
-      rethrow;
-    }
+  // REGISTRAZIONE
+  Future<User?> registraUtente({required String email, required String password, required String nome}) async {
+    UserCredential res = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+    // Salva i dati extra dell'utente
+    await _firestore.collection('users').doc(res.user!.uid).set({
+      'uid': res.user!.uid,
+      'nome': nome,
+      'email': email,
+    });
+    return res.user;
   }
 
-  // 3. LOGOUT
-  Future<void> signOut() async {
-    try {
-      await _auth.signOut();
-    } catch (e) {
-      print("Errore Logout: $e");
-    }
-  }
+  // LOGOUT
+  Future<void> signOut() async => await _auth.signOut();
 
-  // 4. CREAZIONE EVENTO
+  // CREAZIONE EVENTO (Risolve Foto 1)
   Future<void> creaEvento({
     required String titolo,
     required String data,
     required String luogo,
     required String descrizione,
   }) async {
-    try {
-      String? uid = _auth.currentUser?.uid;
-      
-      if (uid == null) throw Exception("Utente non autenticato");
+    String? uid = _auth.currentUser?.uid;
+    if (uid == null) return;
 
-      await _firestore.collection('events').add({
-        'titolo': titolo,
-        'data': data,
-        'luogo': luogo,
-        'descrizione': descrizione,
-        'adminId': uid,
-        'spettatori': [], 
-        'concorrenti': [],
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print("Errore Creazione Evento: $e");
-      rethrow;
-    }
+    await _firestore.collection('events').add({
+      'titolo': titolo,
+      'data': data,
+      'luogo': luogo,
+      'descrizione': descrizione,
+      'adminId': uid, // Identifica il creatore
+      'createdAt': FieldValue.serverTimestamp(),
+      'spettatori': [],
+      'concorrenti': [],
+    });
   }
+
+ Future<void> partecipaEvento({required String eventId, required String ruolo}) async {
+  try {
+    String? uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception("Devi essere loggato");
+
+    DocumentSnapshot eventDoc = await _firestore.collection('events').doc(eventId).get();
+    if (!eventDoc.exists) throw Exception("Evento non trovato");
+    
+    Map<String, dynamic> data = eventDoc.data() as Map<String, dynamic>;
+    List spettatori = data['spettatori'] ?? [];
+    List concorrenti = data['concorrenti'] ?? [];
+
+    if (ruolo == 'Spettatore') {
+      // Se è già concorrente, BLOCCO (Errore)
+      if (concorrenti.contains(uid)) {
+        throw Exception("non puoi entrare come spettatore perché sei già concorrente.");
+      }
+      // Se è già spettatore, ESCI CON SUCCESSO (Nessun errore)
+      if (spettatori.contains(uid)) return; 
+      
+    } else if (ruolo == 'Concorrente') {
+      // Se è già spettatore, BLOCCO (Errore)
+      if (spettatori.contains(uid)) {
+        throw Exception("non puoi entrare come concorrente perché sei già spettatore.");
+      }
+      // Se è già concorrente, ESCI CON SUCCESSO (Nessun errore)
+      if (concorrenti.contains(uid)) return;
+    }
+
+    // Aggiunta al DB solo se non era già presente
+    String campo = (ruolo == 'Spettatore') ? 'spettatori' : 'concorrenti';
+    await _firestore.collection('events').doc(eventId).update({
+      campo: FieldValue.arrayUnion([uid])
+    });
+
+  } catch (e) {
+    rethrow; 
+  }
+}
 }
