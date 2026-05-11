@@ -56,7 +56,7 @@ class _CreateEventViewState extends State<CreateEventView> {
     }
   }
 
-  // --- PARTE MODIFICATA: SELETTORE OTTIMIZZATO ---
+  
   void _mostraSelettore({required String titolo, required List<String> items, required Function(String) onSelected}) {
     showModalBottomSheet(
       context: context,
@@ -209,14 +209,14 @@ class _CreateEventViewState extends State<CreateEventView> {
                           _provinciaSelezionata = val;
                           _comuneSelezionato = null;
                         });
-                        _caricaComuni(val); // Fa partire subito la richiesta dei comuni
+                        _caricaComuni(val); 
                       },
                     ),
                   ),
 
                   const SizedBox(height: 20),
 
-                  // SELETTORE COMUNE CON INDICATORE DI CARICAMENTO
+                  
                   _isCaricandoComuni 
                     ? const Padding(
                         padding: EdgeInsets.symmetric(vertical: 10),

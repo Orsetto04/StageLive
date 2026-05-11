@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Il tuo campo di testo personalizzato (usato in login e registrazione)
+
 class StageTextField extends StatelessWidget {
   final String label;
   final String hint;

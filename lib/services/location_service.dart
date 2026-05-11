@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class LocationService {
-  // Usiamo un'API dedicata che risponde velocemente alle ricerche
+ 
   static const String _apiProvince = "https://comuni-ita.herokuapp.com/api/province";
   static const String _apiComuni = "https://comuni-ita.herokuapp.com/api/comuni/provincia/";
 
@@ -25,7 +25,7 @@ class LocationService {
   // Carica i comuni solo per la provincia selezionata
  Future<List<String>> getComuniPerProvincia(String provincia) async {
   try {
-    // Rimuoviamo eventuali spazi bianchi extra e codifichiamo per l'URL
+    
     final String nomeProvincia = provincia.trim();
     final String urlString = "https://comuni-ita.herokuapp.com/api/comuni/provincia/${Uri.encodeComponent(nomeProvincia)}";
     

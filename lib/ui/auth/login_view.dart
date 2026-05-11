@@ -13,7 +13,7 @@ class _LoginViewState extends State<LoginView> {
   // Istanza del servizio di autenticazione
   final AuthService _auth = AuthService();
 
-  // Logica di accesso AGGIORNATA
+  
   void _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passController.text.trim();
@@ -30,13 +30,13 @@ await _auth.loginUtente(
   password: password
 );
 
-      // Se non lancia eccezioni, l'accesso è riuscito
+    
       if (mounted) {
         _showFeedback("Accesso all'Arena eseguito con successo!", isError: false);
         Navigator.pushReplacementNamed(context, '/events');
       }
     } catch (e) {
-      // Gestione errori (es: utente non trovato, password errata)
+  
       if (mounted) {
         _showFeedback("Credenziali errate o errore di connessione.", isError: true);
       }

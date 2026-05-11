@@ -14,7 +14,6 @@ class _RegisterViewState extends State<RegisterView> {
   
   final AuthService _auth = AuthService();
 
-  // Logica di registrazione AGGIORNATA
   void _handleRegister() async {
     String nome = _nomeController.text.trim();
     String email = _emailController.text.trim();
@@ -37,14 +36,14 @@ class _RegisterViewState extends State<RegisterView> {
     }
 
     try {
-      // Usiamo il metodo corretto del tuo AuthService: registraUtente
+      
       await _auth.registraUtente(
         email: email, 
         password: password, 
         nome: nome
       );
 
-      // Se non lancia eccezioni, il salvataggio su Firestore è riuscito
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Account creato con successo!")),
@@ -52,7 +51,7 @@ class _RegisterViewState extends State<RegisterView> {
         Navigator.pop(context); 
       }
     } catch (e) {
-      // Gestisce gli errori lanciati dal rethrow di AuthService
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Errore: ${e.toString()}")),

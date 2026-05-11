@@ -5,7 +5,7 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Getter per ottenere l'ID utente corrente
+  
   String? get currentUid => _auth.currentUser?.uid;
 
   // LOGIN
@@ -29,7 +29,7 @@ class AuthService {
   // LOGOUT
   Future<void> signOut() async => await _auth.signOut();
 
-  // CREAZIONE EVENTO (Risolve Foto 1)
+  // CREAZIONE EVENTO 
   Future<void> creaEvento({
     required String titolo,
     required String data,

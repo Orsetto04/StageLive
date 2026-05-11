@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stagelive/services/auth_service.dart';
-
+// AGGIUNTE LE IMPORTAZIONI DELLE DUE NUOVE PAGINE
+import 'EventAdminView.dart';
+import 'EventCompetitorView.dart';
 class EventsView extends StatefulWidget {
   const EventsView({super.key});
   @override
@@ -23,7 +25,7 @@ class _EventsViewState extends State<EventsView> {
     }
   }
 
-  // 2. FUNZIONE PER ISCRIVERSI (MESSAGGI MODIFICATI)
+  // 2. FUNZIONE PER ISCRIVERSI (MODIFICATA PER NAVIGAZIONE CONCORRENTE)
   void _iscriviti(String eventId, String ruolo) async {
     try {
       await _auth.partecipaEvento(eventId: eventId, ruolo: ruolo);
@@ -32,8 +34,16 @@ class _EventsViewState extends State<EventsView> {
         // CHIUDE IL POPUP IN CASO DI SUCCESSO
         Navigator.pop(context); 
 
+        // SE IL RUOLO È CONCORRENTE, NAVIGA ALLA FOTO 1
+        if (ruolo == "Concorrente") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const EventCompetitorView()),
+          );
+        }
+
         String messaggioBenvenuto = (ruolo == "Concorrente") 
-            ? "Benvenuto, sei entrato come concorrente." 
+            ? "Benvenuto, compila la tua candidatura." 
             : "Benvenuto, sei entrato come spettatore.";
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -46,9 +56,7 @@ class _EventsViewState extends State<EventsView> {
       }
     } catch (e) {
       if (mounted) {
-        // CHIUDE IL POPUP ANCHE IN CASO DI ERRORE (Aggiunto qui)
         Navigator.pop(context); 
-
         String errorePulito = e.toString().replaceAll("Exception: ", "");
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -62,9 +70,18 @@ class _EventsViewState extends State<EventsView> {
     }
   }
 
-  // 3. FUNZIONE PER ACCESSO GESTIONALE (MIO EVENTO)
+  // 3. FUNZIONE PER ACCESSO GESTIONALE (MODIFICATA PER NAVIGAZIONE ADMIN)
   void _accessoGestionale(String ruolo) {
     Navigator.pop(context); 
+
+    // SE IL RUOLO È AMMINISTRATORE, NAVIGA ALLA FOTO 2
+    if (ruolo == "Amministratore") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const EventAdminView()),
+      );
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: const Color(0xFFD68BFF),
