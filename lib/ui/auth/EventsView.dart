@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stagelive/services/auth_service.dart';
-// AGGIUNTE LE IMPORTAZIONI DELLE DUE NUOVE PAGINE
 import 'EventAdminView.dart';
 import 'EventCompetitorView.dart';
+
 class EventsView extends StatefulWidget {
   const EventsView({super.key});
   @override
@@ -13,7 +13,36 @@ class EventsView extends StatefulWidget {
 class _EventsViewState extends State<EventsView> {
   final AuthService _auth = AuthService();
 
-  // 1. FUNZIONE LOGOUT
+  // --- LOGICA MODIFICATA: CONTROLLO SOLO SE LA CANDIDATURA È GIÀ STATA INVIATA ---
+  void _checkCandidaturaEEntraSpettatore(String eventId) async {
+    try {
+      // Controlliamo se nel database esiste FISICAMENTE la candidatura inviata
+      final snapshot = await FirebaseFirestore.instance
+          .collection('candidature')
+          .where('uid', isEqualTo: _auth.currentUid)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        // Se ha GIÀ INVIATO il modulo, allora lo blocchiamo
+        if (mounted) {
+          Navigator.pop(context); 
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.orange,
+              content: Text("Accesso negato: hai già una candidatura attiva in revisione."),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        // Se non ha mai inviato il modulo, entra senza problemi (anche se è già iscritto come concorrente)
+        _iscriviti(eventId, "Spettatore");
+      }
+    } catch (e) {
+      _iscriviti(eventId, "Spettatore"); // In caso di errore lo facciamo entrare comunque
+    }
+  }
+
   void _handleLogout() async {
     try {
       await _auth.signOut();
@@ -25,73 +54,46 @@ class _EventsViewState extends State<EventsView> {
     }
   }
 
-  // 2. FUNZIONE PER ISCRIVERSI (MODIFICATA PER NAVIGAZIONE CONCORRENTE)
   void _iscriviti(String eventId, String ruolo) async {
     try {
+      // Iscrizione tecnica al database (per i contatori/liste)
       await _auth.partecipaEvento(eventId: eventId, ruolo: ruolo);
       
       if (mounted) {
-        // CHIUDE IL POPUP IN CASO DI SUCCESSO
-        Navigator.pop(context); 
-
-        // SE IL RUOLO È CONCORRENTE, NAVIGA ALLA FOTO 1
+        Navigator.pop(context); // Chiude il popup
+        
         if (ruolo == "Concorrente") {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const EventCompetitorView()),
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const EventCompetitorView()));
+        } else {
+          // Messaggio di successo per lo spettatore
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(backgroundColor: Colors.green, content: Text("Benvenuto come Spettatore!"), behavior: SnackBarBehavior.floating),
           );
         }
-
-        String messaggioBenvenuto = (ruolo == "Concorrente") 
-            ? "Benvenuto, compila la tua candidatura." 
-            : "Benvenuto, sei entrato come spettatore.";
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.green,
-            content: Text(messaggioBenvenuto, style: const TextStyle(fontWeight: FontWeight.bold)),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
       }
     } catch (e) {
+      // Se l'errore è dovuto al fatto che è già iscritto come l'altro ruolo, lo ignoriamo e lo facciamo passare
+      // perché tu vuoi che possa muoversi liberamente tra le due viste finché non invia il modulo.
       if (mounted) {
-        Navigator.pop(context); 
-        String errorePulito = e.toString().replaceAll("Exception: ", "");
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.red, 
-            content: Text(errorePulito, style: const TextStyle(fontWeight: FontWeight.bold)),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        Navigator.pop(context);
+        if (ruolo == "Concorrente") {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const EventCompetitorView()));
+        } else {
+           ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(backgroundColor: Colors.green, content: Text("Bentornato come Spettatore!"), behavior: SnackBarBehavior.floating),
+          );
+        }
       }
     }
   }
 
-  // 3. FUNZIONE PER ACCESSO GESTIONALE (MODIFICATA PER NAVIGAZIONE ADMIN)
   void _accessoGestionale(String ruolo) {
     Navigator.pop(context); 
-
-    // SE IL RUOLO È AMMINISTRATORE, NAVIGA ALLA FOTO 2
     if (ruolo == "Amministratore") {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const EventAdminView()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const EventAdminView()));
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFFD68BFF),
-        content: Text("Accesso autorizzato come $ruolo dell'evento"),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
-  // 4. POPUP PARTECIPAZIONE
   void _showParticipationDialog(BuildContext context, String eventId, String eventTitle, String adminId) {
     final String? myUid = _auth.currentUid;
     final bool isAdmin = (myUid == adminId);
@@ -107,19 +109,14 @@ class _EventsViewState extends State<EventsView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(eventTitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              Text(
-                isAdmin ? "SEI L'ORGANIZZATORE" : "PARTECIPA ALL'ARENA",
-                style: TextStyle(color: isAdmin ? const Color(0xFFD68BFF) : Colors.grey[400], fontWeight: FontWeight.bold),
-              ),
               const SizedBox(height: 30),
-
               if (isAdmin) ...[
-                _roleButton(context, "Gestisci come Staff", Icons.badge, Colors.white12, () => _accessoGestionale("Staff")),
+                _roleButton(context, "Gestisci Staff", Icons.badge, Colors.white12, () => _accessoGestionale("Staff")),
                 const SizedBox(height: 15),
                 _roleButton(context, "Pannello Amministratore", Icons.admin_panel_settings, const Color(0xFFD68BFF), () => _accessoGestionale("Amministratore"), textColor: Colors.black),
               ] else ...[
-                _roleButton(context, "Entra come Spettatore", Icons.visibility, Colors.white12, () => _iscriviti(eventId, "Spettatore")),
+                // MODIFICATO: Controllo database solo per lo spettatore
+                _roleButton(context, "Entra come Spettatore", Icons.visibility, Colors.white12, () => _checkCandidaturaEEntraSpettatore(eventId)),
                 const SizedBox(height: 15),
                 _roleButton(context, "Candidati come Concorrente", Icons.mic, const Color(0xFFD68BFF), () => _iscriviti(eventId, "Concorrente"), textColor: Colors.black),
               ],
@@ -153,13 +150,11 @@ class _EventsViewState extends State<EventsView> {
             itemCount: docs.length,
             itemBuilder: (context, index) {
               var data = docs[index].data() as Map<String, dynamic>;
-              String eventId = docs[index].id;
-              bool isAdmin = _auth.currentUid == data['adminId'];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 15),
                 child: GestureDetector(
-                  onTap: () => _showParticipationDialog(context, eventId, data['titolo'], data['adminId']),
-                  child: _buildEventCard(title: data['titolo'], date: data['data'], location: data['luogo'], isAdmin: isAdmin),
+                  onTap: () => _showParticipationDialog(context, docs[index].id, data['titolo'], data['adminId']),
+                  child: _buildEventCard(title: data['titolo'], date: data['data'], location: data['luogo'], isAdmin: _auth.currentUid == data['adminId']),
                 ),
               );
             },
