@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stagelive/services/auth_service.dart';
 import 'EventAdminView.dart';
 import 'EventCompetitorView.dart';
+import 'EventSpectatorView.dart';
 
 class EventsView extends StatefulWidget {
   const EventsView({super.key});
@@ -13,33 +14,131 @@ class EventsView extends StatefulWidget {
 class _EventsViewState extends State<EventsView> {
   final AuthService _auth = AuthService();
 
-  // --- LOGICA MODIFICATA: CONTROLLO SOLO SE LA CANDIDATURA È GIÀ STATA INVIATA ---
-  void _checkCandidaturaEEntraSpettatore(String eventId) async {
-    try {
-      // Controlliamo se nel database esiste FISICAMENTE la candidatura inviata
-      final snapshot = await FirebaseFirestore.instance
-          .collection('candidature')
-          .where('uid', isEqualTo: _auth.currentUid)
-          .get();
+  void _eliminaEvento(String eventId, bool isAdmin) async {
+    final String? myUid = _auth.currentUid;
+    if (myUid == null) return;
 
-      if (snapshot.docs.isNotEmpty) {
-        // Se ha GIÀ INVIATO il modulo, allora lo blocchiamo
+    try {
+      if (isAdmin) {
+        await FirebaseFirestore.instance.collection('events').doc(eventId).delete();
         if (mounted) {
-          Navigator.pop(context); 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              backgroundColor: Colors.orange,
-              content: Text("Accesso negato: hai già una candidatura attiva in revisione."),
-              behavior: SnackBarBehavior.floating,
-            ),
+            const SnackBar(content: Text("Evento eliminato definitivamente dall'amministratore"), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
           );
         }
       } else {
-        // Se non ha mai inviato il modulo, entra senza problemi (anche se è già iscritto come concorrente)
-        _iscriviti(eventId, "Spettatore");
+        await FirebaseFirestore.instance.collection('events').doc(eventId).update({
+          'hiddenBy': FieldValue.arrayUnion([myUid])
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Evento rimosso dalla tua lista"), backgroundColor: Colors.orange, behavior: SnackBarBehavior.floating),
+          );
+        }
       }
     } catch (e) {
-      _iscriviti(eventId, "Spettatore"); // In caso di errore lo facciamo entrare comunque
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Errore durante l'eliminazione: $e"), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
+  void _gestisciAccessoEvento(String eventId, String eventTitle, String adminId) async {
+    final String? myUid = _auth.currentUid;
+
+    if (myUid == adminId) {
+      _showParticipationDialog(context, eventId, eventTitle, adminId);
+      return;
+    }
+
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('candidature')
+          .where('uid', isEqualTo: myUid)
+          .where('eventId', isEqualTo: eventId)
+          .get();
+
+      if (query.docs.isNotEmpty) {
+        var data = query.docs.first.data();
+        String status = data['status'] ?? 'PENDENTE';
+
+        if (status == 'PENDENTE') {
+          if (mounted) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const WaitingScreen()));
+          }
+        } else if (status == 'APPROVATA' || status == 'ACCETTATA') {
+          // MODIFICATO: Passiamo ID e Titolo dell'evento alla schermata di accettazione
+          if (mounted) {
+            Navigator.push(
+              context, 
+              MaterialPageRoute(
+                builder: (context) => AcceptedScreen(eventId: eventId, eventTitle: eventTitle)
+              ),
+            );
+          }
+        } else if (status == 'RIFIUTATA') {
+          if (mounted) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const RejectedScreen()));
+          }
+        }
+      } else {
+        _showParticipationDialog(context, eventId, eventTitle, adminId);
+      }
+    } catch (e) {
+      _showParticipationDialog(context, eventId, eventTitle, adminId);
+    }
+  }
+
+  void _checkCandidaturaEEntraSpettatore(String eventId, String eventTitle) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('candidature')
+          .where('uid', isEqualTo: _auth.currentUid)
+          .where('eventId', isEqualTo: eventId)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        var data = snapshot.docs.first.data();
+        if (data['status'] == 'PENDENTE') {
+          if (mounted) {
+            Navigator.pop(context); 
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(backgroundColor: Colors.orange, content: Text("Accesso negato: hai già una candidatura attiva in revisione per questo evento."), behavior: SnackBarBehavior.floating),
+            );
+          }
+          return;
+        }
+      }
+      _iscrivitiSpettatore(eventId, eventTitle);
+    } catch (e) {
+      _iscrivitiSpettatore(eventId, eventTitle);
+    }
+  }
+
+  void _iscrivitiSpettatore(String eventId, String eventTitle) async {
+    try {
+      await _auth.partecipaEvento(eventId: eventId, ruolo: "Spettatore");
+      if (mounted) {
+        Navigator.pop(context); 
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EventSpectatorView(eventId: eventId, eventTitle: eventTitle),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EventSpectatorView(eventId: eventId, eventTitle: eventTitle),
+          ),
+        );
+      }
     }
   }
 
@@ -54,43 +153,10 @@ class _EventsViewState extends State<EventsView> {
     }
   }
 
-  void _iscriviti(String eventId, String ruolo) async {
-    try {
-      // Iscrizione tecnica al database (per i contatori/liste)
-      await _auth.partecipaEvento(eventId: eventId, ruolo: ruolo);
-      
-      if (mounted) {
-        Navigator.pop(context); // Chiude il popup
-        
-        if (ruolo == "Concorrente") {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const EventCompetitorView()));
-        } else {
-          // Messaggio di successo per lo spettatore
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(backgroundColor: Colors.green, content: Text("Benvenuto come Spettatore!"), behavior: SnackBarBehavior.floating),
-          );
-        }
-      }
-    } catch (e) {
-      // Se l'errore è dovuto al fatto che è già iscritto come l'altro ruolo, lo ignoriamo e lo facciamo passare
-      // perché tu vuoi che possa muoversi liberamente tra le due viste finché non invia il modulo.
-      if (mounted) {
-        Navigator.pop(context);
-        if (ruolo == "Concorrente") {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const EventCompetitorView()));
-        } else {
-           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(backgroundColor: Colors.green, content: Text("Bentornato come Spettatore!"), behavior: SnackBarBehavior.floating),
-          );
-        }
-      }
-    }
-  }
-
-  void _accessoGestionale(String ruolo) {
+  void _accessoGestionale(String ruolo, String eventId) {
     Navigator.pop(context); 
     if (ruolo == "Amministratore") {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => const EventAdminView()));
+      Navigator.push(context, MaterialPageRoute(builder: (context) => EventAdminView(eventId: eventId)));
     }
   }
 
@@ -111,14 +177,16 @@ class _EventsViewState extends State<EventsView> {
               Text(eventTitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 30),
               if (isAdmin) ...[
-                _roleButton(context, "Gestisci Staff", Icons.badge, Colors.white12, () => _accessoGestionale("Staff")),
+                _roleButton(context, "Gestisci Staff", Icons.badge, Colors.white12, () => _accessoGestionale("Staff", eventId)),
                 const SizedBox(height: 15),
-                _roleButton(context, "Pannello Amministratore", Icons.admin_panel_settings, const Color(0xFFD68BFF), () => _accessoGestionale("Amministratore"), textColor: Colors.black),
+                _roleButton(context, "Pannello Amministratore", Icons.admin_panel_settings, const Color(0xFFD68BFF), () => _accessoGestionale("Amministratore", eventId), textColor: Colors.black),
               ] else ...[
-                // MODIFICATO: Controllo database solo per lo spettatore
-                _roleButton(context, "Entra come Spettatore", Icons.visibility, Colors.white12, () => _checkCandidaturaEEntraSpettatore(eventId)),
+                _roleButton(context, "Entra come Spettatore", Icons.visibility, Colors.white12, () => _checkCandidaturaEEntraSpettatore(eventId, eventTitle)),
                 const SizedBox(height: 15),
-                _roleButton(context, "Candidati come Concorrente", Icons.mic, const Color(0xFFD68BFF), () => _iscriviti(eventId, "Concorrente"), textColor: Colors.black),
+                _roleButton(context, "Candidati come Concorrente", Icons.mic, const Color(0xFFD68BFF), () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => EventCompetitorView(eventId: eventId)));
+                }, textColor: Colors.black),
               ],
             ],
           ),
@@ -129,6 +197,8 @@ class _EventsViewState extends State<EventsView> {
 
   @override
   Widget build(BuildContext context) {
+    final String? myUid = _auth.currentUid;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0F),
       appBar: AppBar(
@@ -144,17 +214,40 @@ class _EventsViewState extends State<EventsView> {
         stream: FirebaseFirestore.instance.collection('events').orderBy('createdAt', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
-          final docs = snapshot.data!.docs;
+          
+          final docs = snapshot.data!.docs.where((doc) {
+            var data = doc.data() as Map<String, dynamic>;
+            List<dynamic> hiddenBy = data['hiddenBy'] ?? [];
+            return !hiddenBy.contains(myUid);
+          }).toList();
+
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            itemCount: docs.length,
+            itemCount: docs.length + 1,
             itemBuilder: (context, index) {
-              var data = docs[index].data() as Map<String, dynamic>;
+              if (index == 0) {
+                return const Padding(
+                  padding: EdgeInsets.only(bottom: 25, top: 10),
+                  child: Text("Eventi", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                );
+              }
+
+              final itemIndex = index - 1;
+              var data = docs[itemIndex].data() as Map<String, dynamic>;
+              final String eventId = docs[itemIndex].id;
+              final bool isAdmin = (myUid == data['adminId']);
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 15),
                 child: GestureDetector(
-                  onTap: () => _showParticipationDialog(context, docs[index].id, data['titolo'], data['adminId']),
-                  child: _buildEventCard(title: data['titolo'], date: data['data'], location: data['luogo'], isAdmin: _auth.currentUid == data['adminId']),
+                  onTap: () => _gestisciAccessoEvento(eventId, data['titolo'], data['adminId']),
+                  child: _buildEventCard(
+                    title: data['titolo'], 
+                    date: data['data'], 
+                    location: data['luogo'], 
+                    isAdmin: isAdmin,
+                    onDelete: () => _eliminaEvento(eventId, isAdmin),
+                  ),
                 ),
               );
             },
@@ -169,7 +262,7 @@ class _EventsViewState extends State<EventsView> {
     );
   }
 
-  Widget _buildEventCard({required String title, required String date, required String location, bool isAdmin = false}) {
+  Widget _buildEventCard({required String title, required String date, required String location, bool isAdmin = false, required VoidCallback onDelete}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -183,13 +276,27 @@ class _EventsViewState extends State<EventsView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              if (isAdmin) 
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFFD68BFF), borderRadius: BorderRadius.circular(5)),
-                  child: const Text("ADMIN", style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
-                ),
+              Expanded(
+                child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              Row(
+                children: [
+                  if (isAdmin) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xFFD68BFF), borderRadius: BorderRadius.circular(5)),
+                      child: const Text("ADMIN", style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  IconButton(
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                    onPressed: onDelete,
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 5),
@@ -207,6 +314,122 @@ class _EventsViewState extends State<EventsView> {
         onPressed: onTap,
         icon: Icon(icon, color: textColor),
         label: Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+}
+
+class WaitingScreen extends StatelessWidget {
+  const WaitingScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B0B0F),
+      body: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(alignment: Alignment.center, children: [
+              Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFFD68BFF).withOpacity(0.15), blurRadius: 40, spreadRadius: 10)])),
+              const Icon(Icons.hourglass_empty_rounded, color: Color(0xFFD68BFF), size: 75),
+            ]),
+            const SizedBox(height: 40),
+            const Text("QUASI PRONTO...", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFFD68BFF), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 3)),
+            const SizedBox(height: 15),
+            const Text("Il tuo talento è in revisione", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            const Text("I direttori artistici stanno valutando i tuoi profili social. Riceverai un responso direttamente qui a breve. Scalda la voce!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 15, height: 1.5)),
+            const SizedBox(height: 60),
+            TextButton(onPressed: () => Navigator.pop(context), child: Text("TORNA ALLA LISTA EVENTI", style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w600, decoration: TextDecoration.underline))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class RejectedScreen extends StatelessWidget {
+  const RejectedScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B0B0F),
+      body: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(alignment: Alignment.center, children: [
+              Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.15), blurRadius: 40, spreadRadius: 10)])),
+              const Icon(Icons.gpp_bad_outlined, color: Colors.redAccent, size: 75),
+            ]),
+            const SizedBox(height: 40),
+            const Text("ESITO REVISIONE", textAlign: TextAlign.center, style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 3)),
+            const SizedBox(height: 15),
+            const Text("Candidatura non approvata", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            const Text("Purtroppo la tua candidatura non rispecchia i requisiti richiesti per questo evento dallo staff. Non fermarti, continua a fare musica!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 15, height: 1.5)),
+            const SizedBox(height: 60),
+            TextButton(onPressed: () => Navigator.pop(context), child: Text("TORNA ALLA LISTA EVENTI", style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w600, decoration: TextDecoration.underline))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- MODIFICATO: ACCEPTED SCREEN CON NAVIGAZIONE DIRETTA ALLA VISTA SPETTATORE ---
+class AcceptedScreen extends StatelessWidget {
+  final String eventId;
+  final String eventTitle;
+
+  const AcceptedScreen({
+    super.key, 
+    required this.eventId, 
+    required this.eventTitle
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B0B0F),
+      body: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(alignment: Alignment.center, children: [
+              Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFFD68BFF).withOpacity(0.20), blurRadius: 40, spreadRadius: 10)])),
+              const Icon(Icons.check_circle_outline_rounded, color: Color(0xFFD68BFF), size: 75),
+            ]),
+            const SizedBox(height: 40),
+            const Text("ESITO REVISIONE", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFFD68BFF), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 3)),
+            const SizedBox(height: 15),
+            const Text("Candidatura approvata!", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            const Text("Congratulazioni! La tua candidatura ha superato le selezioni ed è stata ufficialmente accettata dallo staff. Sei pronto a salire sul palco?", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 15, height: 1.5)),
+            const SizedBox(height: 60),
+            TextButton(
+              onPressed: () {
+                // MODIFICATO: Sostituisce la schermata di successo portando l'artista approvato direttamente nell'area Spettatore/Live dell'Arena
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EventSpectatorView(eventId: eventId, eventTitle: eventTitle),
+                  ),
+                );
+              }, 
+              child: const Text(
+                "ENTRA NEL CAST", 
+                style: TextStyle(color: Color(0xFFD68BFF), fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2, decoration: TextDecoration.underline),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

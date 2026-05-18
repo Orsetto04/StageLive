@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// NOTA: Importa il file in cui si trova il WaitingScreen (es. 'events_view.dart')
+import 'EventsView.dart'; 
+
 class EventCompetitorView extends StatefulWidget {
-  const EventCompetitorView({super.key});
+  // MODIFICATO: Riceve l'id dell'evento specifico per legare la candidatura
+  final String eventId;
+
+  const EventCompetitorView({super.key, required this.eventId});
 
   @override
   State<EventCompetitorView> createState() => _EventCompetitorViewState();
@@ -56,6 +62,7 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
 
     try {
       await FirebaseFirestore.instance.collection('candidature').add({
+        'eventId': widget.eventId, // MODIFICATO: Salva l'evento specifico per cui ci si candida
         'uid': FirebaseAuth.instance.currentUser?.uid,
         'nomeArte': _nomeArteController.text.trim(),
         'genere': _selectedGenre,
@@ -79,7 +86,12 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Candidatura inviata con successo!"), backgroundColor: Colors.green)
         );
-        Navigator.pop(context);
+        
+        // MODIFICATO: Sostituisce la schermata attuale portando l'utente direttamente alla pagina di attesa
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const WaitingScreen()),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,7 +140,6 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
               _buildInput("LUOGO DI NASCITA", "", _luogoController),
             ]),
 
-            // --- NUOVA SEZIONE SOCIAL (FACOLTATIVA) ---
             _buildCardContainer("Social (Opzionale)", Icons.share, [
               _buildInput("INSTAGRAM USERNAME", "@tuoutente", _instagramController),
               _buildInput("TIKTOK USERNAME", "@tuoutente", _tiktokController),
