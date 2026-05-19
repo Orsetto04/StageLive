@@ -45,6 +45,7 @@ class _EventsViewState extends State<EventsView> {
     }
   }
 
+  // --- MODIFICATO: Gestione stato CONFERMATO per saltare la candidatura ---
   void _gestisciAccessoEvento(String eventId, String eventTitle, String adminId) async {
     final String? myUid = _auth.currentUid;
 
@@ -61,20 +62,31 @@ class _EventsViewState extends State<EventsView> {
           .get();
 
       if (query.docs.isNotEmpty) {
-        var data = query.docs.first.data();
-        String status = data['status'] ?? 'PENDENTE';
+        var doc = query.docs.first;
+        var data = doc.data();
+        String status = (data['status'] ?? 'PENDENTE').toString().toUpperCase();
+        String docId = doc.id;
 
         if (status == 'PENDENTE') {
           if (mounted) {
             Navigator.push(context, MaterialPageRoute(builder: (context) => const WaitingScreen()));
           }
         } else if (status == 'APPROVATA' || status == 'ACCETTATA') {
-          // MODIFICATO: Passiamo ID e Titolo dell'evento alla schermata di accettazione
           if (mounted) {
             Navigator.push(
               context, 
               MaterialPageRoute(
-                builder: (context) => AcceptedScreen(eventId: eventId, eventTitle: eventTitle)
+                builder: (context) => AcceptedScreen(eventId: eventId, eventTitle: eventTitle, docId: docId)
+              ),
+            );
+          }
+        } else if (status == 'CONFERMATO') {
+          // Se è già confermato entra direttamente nell'arena con il menu in basso
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EventCompetitorDashboard(eventId: eventId, eventTitle: eventTitle),
               ),
             );
           }
@@ -101,11 +113,12 @@ class _EventsViewState extends State<EventsView> {
 
       if (snapshot.docs.isNotEmpty) {
         var data = snapshot.docs.first.data();
-        if (data['status'] == 'PENDENTE') {
+        String status = (data['status'] ?? 'PENDENTE').toString().toUpperCase();
+        if (status == 'PENDENTE' || status == 'APPROVATA' || status == 'ACCETTATA' || status == 'CONFERMATO') {
           if (mounted) {
             Navigator.pop(context); 
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(backgroundColor: Colors.orange, content: Text("Accesso negato: hai già una candidatura attiva in revisione per questo evento."), behavior: SnackBarBehavior.floating),
+              const SnackBar(backgroundColor: Colors.orange, content: Text("Accesso negato: hai una candidatura attiva o sei già nel cast di questo evento."), behavior: SnackBarBehavior.floating),
             );
           }
           return;
@@ -381,15 +394,17 @@ class RejectedScreen extends StatelessWidget {
   }
 }
 
-// --- MODIFICATO: ACCEPTED SCREEN CON NAVIGAZIONE DIRETTA ALLA VISTA SPETTATORE ---
+// --- MODIFICATO: ACCEPTED SCREEN CON AGGIORNAMENTO STATO FIRESTORE ---
 class AcceptedScreen extends StatelessWidget {
   final String eventId;
   final String eventTitle;
+  final String docId; 
 
   const AcceptedScreen({
     super.key, 
     required this.eventId, 
-    required this.eventTitle
+    required this.eventTitle,
+    required this.docId,
   });
 
   @override
@@ -414,14 +429,26 @@ class AcceptedScreen extends StatelessWidget {
             const Text("Congratulazioni! La tua candidatura ha superato le selezioni ed è stata ufficialmente accettata dallo staff. Sei pronto a salire sul palco?", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 15, height: 1.5)),
             const SizedBox(height: 60),
             TextButton(
-              onPressed: () {
-                // MODIFICATO: Sostituisce la schermata di successo portando l'artista approvato direttamente nell'area Spettatore/Live dell'Arena
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EventSpectatorView(eventId: eventId, eventTitle: eventTitle),
-                  ),
-                );
+              onPressed: () async {
+                try {
+                  // Cambia lo stato sul DB in CONFERMATO per salvare la scelta definitivamente
+                  await FirebaseFirestore.instance
+                      .collection('candidature')
+                      .doc(docId)
+                      .update({'status': 'CONFERMATO'});
+                } catch (e) {
+                  print("Errore aggiornamento: $e");
+                }
+
+                if (context.mounted) {
+                  // Porta alla dashboard principale con il menu sotto
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventCompetitorDashboard(eventId: eventId, eventTitle: eventTitle),
+                    ),
+                  );
+                }
               }, 
               child: const Text(
                 "ENTRA NEL CAST", 
@@ -429,6 +456,223 @@ class AcceptedScreen extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- NUOVO: DASHBOARD DEL CONCORRENTE CON MENU IN BASSO ---
+class EventCompetitorDashboard extends StatefulWidget {
+  final String eventId;
+  final String eventTitle;
+
+  const EventCompetitorDashboard({super.key, required this.eventId, required this.eventTitle});
+
+  @override
+  State<EventCompetitorDashboard> createState() => _EventCompetitorDashboardState();
+}
+
+class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> _tabs = [
+      _buildScalettaView(),
+      _buildListaConcorrentiView(),
+      _buildClassificaView(),
+      _buildProfiloView(),
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B0B0F),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(widget.eventTitle, style: const TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: _tabs[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        backgroundColor: const Color(0xFF16161E),
+        selectedItemColor: const Color(0xFFD68BFF),
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.queue_music), label: "Scaletta"),
+          BottomNavigationBarItem(icon: Icon(Icons.mic), label: "Concorrenti"),
+          BottomNavigationBarItem(icon: Icon(Icons.leaderboard), label: "Classifica"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profilo"),
+        ],
+      ),
+    );
+  }
+
+  // 1. SCALETTA (Stessa logica e grafica degli spettatori)
+  Widget _buildScalettaView() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('candidature')
+          .where('eventId', isEqualTo: widget.eventId)
+          .where('status', whereIn: ['APPROVATA', 'ACCETTATA', 'CONFERMATO'])
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Center(child: Text("Nessun artista in scaletta", style: TextStyle(color: Colors.grey)));
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            var data = docs[index].data() as Map<String, dynamic>;
+            String nome = data['nome'] ?? data['username'] ?? 'Artista';
+            String brano = data['brano'] ?? 'In attesa di scaletta';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(15)),
+              child: Row(
+                children: [
+                  CircleAvatar(backgroundColor: const Color(0xFFD68BFF).withOpacity(0.2), child: Text("${index + 1}", style: const TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold))),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(brano, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 2. LISTA CONCORRENTI (Mostra tutti i concorrenti approvati)
+  Widget _buildListaConcorrentiView() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('candidature')
+          .where('eventId', isEqualTo: widget.eventId)
+          .where('status', whereIn: ['APPROVATA', 'ACCETTATA', 'CONFERMATO'])
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Center(child: Text("Nessun concorrente nel cast", style: TextStyle(color: Colors.grey)));
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            var data = docs[index].data() as Map<String, dynamic>;
+            String nome = data['nome'] ?? data['username'] ?? 'Concorrente';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
+              child: Row(
+                children: [
+                  const Icon(Icons.star, color: Color(0xFFD68BFF), size: 24),
+                  const SizedBox(width: 15),
+                  Text(nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 3. CLASSIFICA (Stessa logica e grafica degli spettatori)
+  Widget _buildClassificaView() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('candidature')
+          .where('eventId', isEqualTo: widget.eventId)
+          .where('status', whereIn: ['APPROVATA', 'ACCETTATA', 'CONFERMATO'])
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Center(child: Text("Nessuna classifica disponibile", style: TextStyle(color: Colors.grey)));
+
+        var sortedDocs = docs.toList()..sort((a, b) {
+          var dataA = a.data() as Map<String, dynamic>;
+          var dataB = b.data() as Map<String, dynamic>;
+          int votiA = dataA['voti'] ?? 0;
+          int votiB = dataB['voti'] ?? 0;
+          return votiB.compareTo(votiA);
+        });
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: sortedDocs.length,
+          itemBuilder: (context, index) {
+            var data = sortedDocs[index].data() as Map<String, dynamic>;
+            String nome = data['nome'] ?? data['username'] ?? 'Artista';
+            int voti = data['voti'] ?? 0;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(15)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text("#${index + 1}", style: TextStyle(color: index < 3 ? const Color(0xFFD68BFF) : Colors.grey, fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(width: 15),
+                      Text(nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Text("$voti Punti", style: const TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 4. PROFILO (Placeholder grafico coordinato)
+  Widget _buildProfiloView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(30),
+        child: Container(
+          padding: const EdgeInsets.all(25),
+          decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFD68BFF).withOpacity(0.3))),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.account_circle, size: 80, color: Color(0xFFD68BFF)),
+              const SizedBox(height: 15),
+              const Text("Il Tuo Profilo", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFFD68BFF).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                child: const Text("CONCORRENTE NEL CAST", style: TextStyle(color: Color(0xFFD68BFF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+              ),
+              const SizedBox(height: 25),
+              const Text("Sezione profilo in fase di sviluppo. Qui potrai gestire le tue tracce e i tuoi dettagli social!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5)),
+            ],
+          ),
         ),
       ),
     );
