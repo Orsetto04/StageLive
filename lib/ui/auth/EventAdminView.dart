@@ -95,12 +95,43 @@ class _EventAdminViewState extends State<EventAdminView> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
                         ),
                         onPressed: () async {
-                          final sm = ScaffoldMessenger.of(context);
-                          await FirebaseFirestore.instance.collection('candidature').doc(docId).update({'status': 'ACCETTATA'});
-                          sm.showSnackBar(
-                            const SnackBar(content: Text("Candidatura Accettata! Aggiunto al Cast"), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating)
-                          );
-                        },
+  final sm = ScaffoldMessenger.of(context);
+  try {
+    // 1. Aggiorna lo stato della candidatura (La riga che avevi già)
+    await FirebaseFirestore.instance
+        .collection('candidature')
+        .doc(docId)
+        .update({'status': 'ACCETTATA'});
+
+    // 2. LA LOGICA MANCANTE: Inserisce il concorrente nell'evento specifico
+    await FirebaseFirestore.instance
+        .collection('events') 
+        .doc(widget.eventId) // Entra nell'evento corrente
+        .collection('concorrenti') // Apre (o crea) la sotto-collezione
+        .add({
+      'nomeArte': data['nomeArte'] ?? "N/A",
+      'genere': data['genere'] ?? "N/A",
+      'descrizione': data['descrizione'] ?? "",
+      'timestamp': FieldValue.serverTimestamp(), // Fondamentale per l'ordinamento dello spettatore
+    });
+
+    // Mostra il messaggio di successo verde
+    sm.showSnackBar(
+      const SnackBar(
+        content: Text("Candidatura Accettata! Aggiunto ai concorrenti live"),
+        backgroundColor: Colors.green,
+      ),
+    );
+  } catch (e) {
+    // Se qualcosa va storto (es. permessi di Firebase), ti avvisa con una barra rossa
+    sm.showSnackBar(
+      SnackBar(
+        content: Text("Errore durante l'approvazione: $e"),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+},
                         icon: const Icon(Icons.check_circle_outline, size: 18),
                         label: const Text("Accetta", style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
