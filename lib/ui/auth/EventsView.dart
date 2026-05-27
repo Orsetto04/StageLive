@@ -4,6 +4,7 @@ import 'package:stagelive/services/auth_service.dart';
 import 'EventAdminView.dart';
 import 'EventCompetitorView.dart';
 import 'EventSpectatorView.dart';
+import 'EventStaffView.dart'; // Import della pagina dello staff
 
 class EventsView extends StatefulWidget {
   const EventsView({super.key});
@@ -45,13 +46,53 @@ class _EventsViewState extends State<EventsView> {
     }
   }
 
-  // --- MODIFICATO: Gestione stato CONFERMATO per saltare la candidatura ---
+  // --- MODIFICATO: Controllo Accesso Staff legato al DATABASE (Firestore) ---
   void _gestisciAccessoEvento(String eventId, String eventTitle, String adminId) async {
     final String? myUid = _auth.currentUid;
+    if (myUid == null) return; // Sicurezza: se l'utente non è loggato ferma l'esecuzione
 
+    // 🌟 SE SEI AMMINISTRATORE: Entri direttamente senza passare dal Dialog
     if (myUid == adminId) {
-      _showParticipationDialog(context, eventId, eventTitle, adminId);
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => EventAdminView(eventId: eventId)),
+        );
+      }
       return;
+    }
+
+    // 🌟 NUOVO CONTROLLO STAFF DA DATABASE:
+    // Cerchiamo se esiste un documento nella collezione 'staff' con ID 'utente_evento'
+    // 🌟 NUOVO CONTROLLO STAFF DA SOTTOCOLLEZIONE DEL SINGOLO EVENTO:
+    try {
+      final staffDoc = await FirebaseFirestore.instance
+          .collection('eventi')
+          .doc(eventId)        // ID dell'evento su cui hai cliccato
+          .collection('staff') // Sottocollezione interna
+          .doc(myUid)          // Il tuo UID utente
+          .get();
+
+      if (staffDoc.exists) {
+        var data = staffDoc.data();
+        if (data != null && data['autorizzato'] == true) {
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EventStaffDashboard(
+                  eventId: eventId, 
+                  eventTitle: eventTitle,
+                  inizialmenteAutorizzato: true, // 🌟 PASSIAMO TRUE: Salta il codice ed entra subito!
+                ),
+              ),
+            );
+          }
+          return; // Interrompe l'esecuzione ed evita di mostrare il dialog o le candidature
+        }
+      }
+    } catch (e) {
+      print("Errore lettura Staff da Sottocollezione: $e");
     }
 
     try {
@@ -81,7 +122,6 @@ class _EventsViewState extends State<EventsView> {
             );
           }
         } else if (status == 'CONFERMATO') {
-          // Se è già confermato entra direttamente nell'arena con il menu in basso
           if (mounted) {
             Navigator.push(
               context,
@@ -166,17 +206,7 @@ class _EventsViewState extends State<EventsView> {
     }
   }
 
-  void _accessoGestionale(String ruolo, String eventId) {
-    Navigator.pop(context); 
-    if (ruolo == "Amministratore") {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => EventAdminView(eventId: eventId)));
-    }
-  }
-
   void _showParticipationDialog(BuildContext context, String eventId, String eventTitle, String adminId) {
-    final String? myUid = _auth.currentUid;
-    final bool isAdmin = (myUid == adminId);
-
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF16161E),
@@ -189,18 +219,32 @@ class _EventsViewState extends State<EventsView> {
             children: [
               Text(eventTitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 30),
-              if (isAdmin) ...[
-                _roleButton(context, "Gestisci Staff", Icons.badge, Colors.white12, () => _accessoGestionale("Staff", eventId)),
-                const SizedBox(height: 15),
-                _roleButton(context, "Pannello Amministratore", Icons.admin_panel_settings, const Color(0xFFD68BFF), () => _accessoGestionale("Amministratore", eventId), textColor: Colors.black),
-              ] else ...[
-                _roleButton(context, "Entra come Spettatore", Icons.visibility, Colors.white12, () => _checkCandidaturaEEntraSpettatore(eventId, eventTitle)),
-                const SizedBox(height: 15),
-                _roleButton(context, "Candidati come Concorrente", Icons.mic, const Color(0xFFD68BFF), () {
-                  Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => EventCompetitorView(eventId: eventId)));
-                }, textColor: Colors.black),
-              ],
+              
+              // Opzione 1: Spettatore
+              _roleButton(context, "Entra come Spettatore", Icons.visibility, Colors.white12, () => _checkCandidaturaEEntraSpettatore(eventId, eventTitle)),
+              const SizedBox(height: 15),
+              
+              // Opzione 2: Staff
+              _roleButton(context, "Partecipa come Staff", Icons.badge, Colors.white12, () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EventStaffDashboard(
+                      eventId: eventId, 
+                      eventTitle: eventTitle, 
+                      inizialmenteAutorizzato: false, // 🌟 MODIFICATO: Passiamo false così gli chiede il codice a 6 cifre
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 15),
+              
+              // Opzione 3: Concorrente
+              _roleButton(context, "Candidati come Concorrente", Icons.mic, const Color(0xFFD68BFF), () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => EventCompetitorView(eventId: eventId)));
+              }, textColor: Colors.black),
             ],
           ),
         );
@@ -332,6 +376,7 @@ class _EventsViewState extends State<EventsView> {
   }
 }
 
+
 class WaitingScreen extends StatelessWidget {
   const WaitingScreen({super.key});
   @override
@@ -394,7 +439,6 @@ class RejectedScreen extends StatelessWidget {
   }
 }
 
-// --- MODIFICATO: ACCEPTED SCREEN CON AGGIORNAMENTO STATO FIRESTORE ---
 class AcceptedScreen extends StatelessWidget {
   final String eventId;
   final String eventTitle;
@@ -431,7 +475,6 @@ class AcceptedScreen extends StatelessWidget {
             TextButton(
               onPressed: () async {
                 try {
-                  // Cambia lo stato sul DB in CONFERMATO per salvare la scelta definitivamente
                   await FirebaseFirestore.instance
                       .collection('candidature')
                       .doc(docId)
@@ -441,7 +484,6 @@ class AcceptedScreen extends StatelessWidget {
                 }
 
                 if (context.mounted) {
-                  // Porta alla dashboard principale con il menu sotto
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
@@ -462,7 +504,6 @@ class AcceptedScreen extends StatelessWidget {
   }
 }
 
-// --- NUOVO: DASHBOARD DEL CONCORRENTE CON MENU IN BASSO ---
 class EventCompetitorDashboard extends StatefulWidget {
   final String eventId;
   final String eventTitle;
@@ -514,7 +555,6 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     );
   }
 
-  // 1. SCALETTA (Stessa logica e grafica degli spettatori)
   Widget _buildScalettaView() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -560,7 +600,6 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     );
   }
 
-  // 2. LISTA CONCORRENTI (Mostra tutti i concorrenti approvati)
   Widget _buildListaConcorrentiView() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -597,7 +636,6 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     );
   }
 
-  // 3. CLASSIFICA (Stessa logica e grafica degli spettatori)
   Widget _buildClassificaView() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -649,7 +687,6 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     );
   }
 
-  // 4. PROFILO (Placeholder grafico coordinato)
   Widget _buildProfiloView() {
     return Center(
       child: Padding(
