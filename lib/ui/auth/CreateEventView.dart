@@ -193,7 +193,7 @@ class _CreateEventViewState extends State<CreateEventView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField("Titolo Evento", _titoloController, Icons.emoji_events),
+                  _buildTextField("Titolo Evento", _titoloController, Icons.emoji_events_sharp),
                   const SizedBox(height: 20),
 
                   // SELETTORE PROVINCIA

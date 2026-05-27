@@ -81,7 +81,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     // 🟢 MODIFICATO SOLO QUESTO: Ora punta correttamente alla sotto-collezione dell'evento corrente
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('events')
+          .collection('eventi')
           .doc(widget.eventId)
           .collection('concorrenti')
           .snapshots(),
@@ -385,7 +385,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     return StreamBuilder<QuerySnapshot>(
       // Ascolta in tempo reale tutti i concorrenti inseriti nell'evento
       stream: FirebaseFirestore.instance
-          .collection('events')
+          .collection('eventi')
           .doc(widget.eventId)
           .collection('concorrenti')
           .orderBy('timestamp', descending: true) // I più recenti appaiono per primi
@@ -629,48 +629,54 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
               // --- BOTTONE GRADIENTE DI INVIO VOTO ---
               InkWell(
                 onTap: _selectedVote == null ? null : () async {
-                  // Questo codice va dentro l'onPressed del pulsante "INVIA VOTO"
-void inviaVotoSpettatore(String concorrenteId, double votoScelto) async {
-  // Riferimento al documento del concorrente votato
+  final String concorrenteId = artistId;
+  final double votoScelto = _selectedVote!.toDouble();
+
+  // 🚨 NOTA: Assicurati che qui ci sia scritto 'eventi' o 'events' 
+  // coerentemente con dove l'amministratore crea l'arena!
   DocumentReference concorrenteRef = FirebaseFirestore.instance
+      .collection('eventi') 
+      .doc(widget.eventId)
       .collection('concorrenti')
       .doc(concorrenteId);
 
   try {
-    await FirebaseFirestore.instance.runTransaction((transaction) async {
-      // 1. Leggi i dati attuali del concorrente dal database
-      DocumentSnapshot snapshot = await transaction.get(concorrenteRef);
+    // 🚀 LA SVOLTA: Usiamo FieldValue.increment invece della transazione.
+    // Questo comando dice a Firestore: "Prendi il valore che c'è sul server e sommaci questo",
+    // in modo istantaneo e senza blocchi d'attesa.
+    await concorrenteRef.update({
+      'totaleSommaVoti': FieldValue.increment(votoScelto),
+      'numeroVoti': FieldValue.increment(1),
+    });
+    
+    // Feedback immediato a schermo
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Voto inviato con successo! Classifica aggiornata.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
 
-      if (!snapshot.exists) {
-        throw Exception("Il concorrente non esiste!");
-      }
-
-      // 2. Recupera i valori attuali (se non esistono nel db, partono da 0)
-      double totaleAttuale = (snapshot.data() as Map<String, dynamic>)['totaleSommaVoti']?.toDouble() ?? 0.0;
-      int numeroVotiAttuale = (snapshot.data() as Map<String, dynamic>)['numeroVoti']?.toInt() ?? 0;
-
-      // 3. Calcola i nuovi valori aggiungendo il voto di questo spettatore
-      double nuovoTotale = totaleAttuale + votoScelto;
-      int nuovoNumeroVoti = numeroVotiAttuale + 1;
-
-      // 4. Salva i dati aggiornati nel database
-      transaction.update(concorrenteRef, {
-        'totaleSommaVoti': nuovoTotale,
-        'numeroVoti': nuovoNumeroVoti,
-      });
+    // Cambia schermata e resetta la selezione
+    setState(() {
+      _selectedIndex = 1; // Ti sposta sulla tab della Classifica Live
+      _selectedVote = null;
     });
 
-    // Mostra un feedback di successo (es. uno SnackBar) senza alterare la UI grafica
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Voto inviato con successo! Classifica aggiornata.')),    );
   } catch (e) {
-    print("Errore durante l'invio del voto: $e");
-  }
-   setState() {
-      _selectedIndex = 1; // Supponendo che la classifica sia all'indice 1 del tuo Tab o PageView
+    print("Errore immediato durante l'invio del voto: $e");
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Errore di scrittura: ${e.toString()}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
-}
-                },
+  }
+},
                 child: Container(
                   width: double.infinity,
                   height: 55,

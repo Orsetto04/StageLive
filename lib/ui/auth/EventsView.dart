@@ -20,14 +20,14 @@ class _EventsViewState extends State<EventsView> {
 
     try {
       if (isAdmin) {
-        await FirebaseFirestore.instance.collection('events').doc(eventId).delete();
+        await FirebaseFirestore.instance.collection('eventi').doc(eventId).delete();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Evento eliminato definitivamente dall'amministratore"), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
           );
         }
       } else {
-        await FirebaseFirestore.instance.collection('events').doc(eventId).update({
+        await FirebaseFirestore.instance.collection('eventi').doc(eventId).update({
           'hiddenBy': FieldValue.arrayUnion([myUid])
         });
         if (mounted) {
@@ -224,7 +224,7 @@ class _EventsViewState extends State<EventsView> {
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('events').orderBy('createdAt', descending: true).snapshots(),
+        stream: FirebaseFirestore.instance.collection('eventi').orderBy('createdAt', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
           

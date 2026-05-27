@@ -105,7 +105,7 @@ class _EventAdminViewState extends State<EventAdminView> {
 
     // 2. LA LOGICA MANCANTE: Inserisce il concorrente nell'evento specifico
     await FirebaseFirestore.instance
-        .collection('events') 
+        .collection('eventi') 
         .doc(widget.eventId) // Entra nell'evento corrente
         .collection('concorrenti') // Apre (o crea) la sotto-collezione
         .add({

@@ -39,7 +39,7 @@ class AuthService {
     String? uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    await _firestore.collection('events').add({
+    await _firestore.collection('eventi').add({
       'titolo': titolo,
       'data': data,
       'luogo': luogo,
@@ -56,7 +56,7 @@ class AuthService {
     String? uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception("Devi essere loggato");
 
-    DocumentSnapshot eventDoc = await _firestore.collection('events').doc(eventId).get();
+    DocumentSnapshot eventDoc = await _firestore.collection('eventi').doc(eventId).get();
     if (!eventDoc.exists) throw Exception("Evento non trovato");
     
     Map<String, dynamic> data = eventDoc.data() as Map<String, dynamic>;
@@ -82,7 +82,7 @@ class AuthService {
 
     // Aggiunta al DB solo se non era già presente
     String campo = (ruolo == 'Spettatore') ? 'spettatori' : 'concorrenti';
-    await _firestore.collection('events').doc(eventId).update({
+    await _firestore.collection('eventi').doc(eventId).update({
       campo: FieldValue.arrayUnion([uid])
     });
 

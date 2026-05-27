@@ -33,7 +33,7 @@ await _auth.loginUtente(
     
       if (mounted) {
         _showFeedback("Accesso all'Arena eseguito con successo!", isError: false);
-        Navigator.pushReplacementNamed(context, '/events');
+        Navigator.pushReplacementNamed(context, '/eventi');
       }
     } catch (e) {
   

@@ -32,7 +32,7 @@ class StageLiveApp extends StatelessWidget {
     routes: {
       '/login': (context) => LoginView(),
       '/register': (context) => RegisterView(),
-      '/events': (context) => EventsView(), 
+      '/eventi': (context) => EventsView(), 
      '/create-event': (context) => CreateEventView(),
     },
     );
