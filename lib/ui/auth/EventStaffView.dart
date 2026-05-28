@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:stagelive/services/auth_service.dart';
+import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
+import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
 
 class EventStaffDashboard extends StatefulWidget {
   final String eventId;
@@ -250,9 +252,9 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
 
     // SE IL CODICE È CORRETTO: Sblocca la dashboard reale con le 4 tab in basso
     final List<Widget> _tabs = [
-      _buildScalettaView(),
+      ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'staff'),
       _buildListaConcorrentiView(),
-      _buildClassificaView(),
+      ClassificaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle),
       _buildProfiloView(),
     ];
 

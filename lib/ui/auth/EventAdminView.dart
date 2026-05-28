@@ -2,10 +2,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Aggiunto per abilitare l'uso della Clipboard (Appunti)
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
+import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
 
 class EventAdminView extends StatefulWidget {
   final String eventId;
-  const EventAdminView({super.key, required this.eventId});
+  final String eventTitle;
+  const EventAdminView({super.key, required this.eventId, required this.eventTitle});
 
   @override
   State<EventAdminView> createState() => _EventAdminViewState();
@@ -184,34 +187,7 @@ class _EventAdminViewState extends State<EventAdminView> {
     );
   }
 
-  // --- SCHERMATA 2: SCALETTA LIVE ADMIN (INALTERATA) ---
-  Widget _buildScalettaLive() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "BACKSTAGE MANAGEMENT", 
-            style: TextStyle(color: Color(0xFFD68BFF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2)
-          ),
-          const SizedBox(height: 5),
-          const Text(
-            "Scaletta Live", 
-            style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)
-          ),
-          const SizedBox(height: 60),
-
-          const Center(
-            child: Text(
-              "Nessun artista in scaletta", 
-              style: TextStyle(color: Colors.grey, fontSize: 15)
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+ 
 
   // --- SCHERMATA 4: PROFILO ADMIN CON GENERAZIONE E COPIA CODICE (MODIFICATA) ---
   Widget _buildProfiloAdmin() {
@@ -362,11 +338,11 @@ class _EventAdminViewState extends State<EventAdminView> {
   Widget _buildBody() {
     switch (_selectedIndex) {
       case 0:
-        return const Center(child: Text("Classifica\n(Schermata in arrivo)", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 16)));
+        return ClassificaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, onBackToVoting: () => setState(() => _selectedIndex = 1));
       case 1:
         return _buildCandidatureList();
       case 2:
-        return _buildScalettaLive(); 
+        return ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'admin'); 
       case 3:
         return _buildProfiloAdmin();
       default:

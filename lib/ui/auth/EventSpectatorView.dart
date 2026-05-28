@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
 
 class EventSpectatorView extends StatefulWidget {
   final String eventId;
@@ -15,10 +16,10 @@ class EventSpectatorView extends StatefulWidget {
 }
 
 class _EventSpectatorViewState extends State<EventSpectatorView> {
-  // 🟢 MODIFICATO: Default su 0 (Votazioni) così si apre direttamente sulla schermata di voto!
+  // Default su 0 (Votazioni) così si apre direttamente sulla schermata di voto!
   int _selectedIndex = 0; 
   int? _selectedVote;
-  // 🟢 AGGIUNTO: Tiene traccia di quale artista della lista stiamo guardando/votando
+  // Tiene traccia di quale artista della lista stiamo guardando/votando
   int _currentArtistIndex = 0; 
 
   // --- SCHERMATA SCALETTA LIVE ---
@@ -63,22 +64,14 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     );
   }
 
-
-// =========================================================================
+  // =========================================================================
   // SCHERMATA CLASSIFICA LIVE COLLEGATA A FIREBASE FIRESTORE (In tempo reale)
   // =========================================================================
-
- // =========================================================================
-  // SCHERMATA CLASSIFICA LIVE COLLEGATA A FIREBASE FIRESTORE (In tempo reale)
-  // =========================================================================
-
   Widget _buildClassificaLive() {
     const Color localPurple = Color(0xFFBC53EE);
     const Color localPink = Color(0xFFFA6A7F);
     const Color localMutedText = Colors.white54;
 
-    // Utilizziamo lo StreamBuilder per ascoltare i cambiamenti della collezione 'concorrenti'
-    // 🟢 MODIFICATO SOLO QUESTO: Ora punta correttamente alla sotto-collezione dell'evento corrente
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('eventi')
@@ -86,7 +79,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
           .collection('concorrenti')
           .snapshots(),
       builder: (context, snapshot) {
-        // Schermata di caricamento mentre Firebase si connette
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: localPurple));
         }
@@ -104,7 +96,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
           // Calcoliamo la media matematica al volo (Evita divisioni per zero)
           double media = voti > 0 ? (totale / voti) : 0.0;
 
-          // 🟢 MODIFICATO SOLO QUESTO: Usiamo 'nomeArte' e 'genere' coerentemente con la collezione dell'evento
           return {
             'id': doc.id,
             'nome': data['nomeArte'] ?? 'Sconosciuto',
@@ -247,7 +238,9 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                       ),
                       child: ElevatedButton(
                         onPressed: () {
-                          // Logica gestita da te per tornare alla votazione
+                          setState(() {
+                            _selectedIndex = 0; // Riporta alla schermata di voto
+                          });
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -274,7 +267,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
       },
     );
   }
-  // AGGIORNAMENTO HELPER: Accetta l'URL dell'immagine reale da Firebase
+
   Widget _buildPodiumItem({
     required String name,
     required String score,
@@ -339,7 +332,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     );
   }
 
-  // AGGIORNAMENTO HELPER: Accetta l'URL dell'immagine reale da Firebase
   Widget _buildListRow(String rank, String name, String category, String vote, String imageUrl) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 11.0),
@@ -377,18 +369,14 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     );
   }
 
-  
-
-
   // --- SCHERMATA VOTAZIONI LIVE (OTTIMIZZATA MULTI-CONCORRENTE) ---
   Widget _buildVotazioniLive() {
     return StreamBuilder<QuerySnapshot>(
-      // Ascolta in tempo reale tutti i concorrenti inseriti nell'evento
       stream: FirebaseFirestore.instance
           .collection('eventi')
           .doc(widget.eventId)
           .collection('concorrenti')
-          .orderBy('timestamp', descending: true) // I più recenti appaiono per primi
+          .orderBy('timestamp', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -404,39 +392,29 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
           );
         }
 
-        // Lista di tutti i documenti dei concorrenti approvati
         final docs = snapshot.data!.docs;
         
-        // Controllo di sicurezza: se la lista si accorcia, resetta l'indice a 0 per evitare crash
         if (_currentArtistIndex >= docs.length) {
           _currentArtistIndex = 0;
         }
 
-        // Estrazione del concorrente attualmente selezionato dalle frecce
         final artistDoc = docs[_currentArtistIndex];
         final artistData = artistDoc.data() as Map<String, dynamic>;
         final String artistId = artistDoc.id;
         final String nomeArte = artistData['nomeArte'] ?? "Artista";
-        final String categoria = artistData['genere'] ?? "Categoria";
+        final String category = artistData['genere'] ?? "Categoria";
 
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- INTESTAZIONE SCHERMATA ---
               const Text(
                 "LIVE SHOW IN CORSO",
-                style: TextStyle(
-                  color: Color(0xFFFF7B93),
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
+                style: TextStyle(color: Color(0xFFFF7B93), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2),
               ),
               const SizedBox(height: 5),
               
-              // Riga intestazione con contatore artisti attivo se sono più di uno
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -457,7 +435,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
               ),
               const SizedBox(height: 25),
 
-              // --- CARD CON FONDO GRAFICO ED ELEMENTI DI NAVIGAZIONE ---
               Container(
                 width: double.infinity,
                 height: 340,
@@ -472,7 +449,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                 ),
                 child: Stack(
                   children: [
-                    // Sfumatura scura inferiore per garantire leggibilità
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(30),
@@ -484,7 +460,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                       ),
                     ),
                     
-                    // Contenuto testuale dell'artista
                     Padding(
                       padding: const EdgeInsets.all(24),
                       child: Column(
@@ -520,14 +495,13 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                             style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            "Categoria: $categoria",
+                            "Categoria: $category",
                             style: const TextStyle(color: Colors.white60, fontSize: 14),
                           ),
                         ],
                       ),
                     ),
 
-                    // 🟢 FRECCIA SINISTRA (Mostrata solo se non è il primo artista)
                     if (_currentArtistIndex > 0)
                       Align(
                         alignment: Alignment.centerLeft,
@@ -540,7 +514,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                               onPressed: () {
                                 setState(() {
                                   _currentArtistIndex--;
-                                  _selectedVote = null; // Resetta il voto per il nuovo artista scelto
+                                  _selectedVote = null;
                                 });
                               },
                             ),
@@ -548,7 +522,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                         ),
                       ),
 
-                    // 🟢 FRECCIA DESTRA (Mostrata solo se ci sono altri artisti successivi)
                     if (_currentArtistIndex < docs.length - 1)
                       Align(
                         alignment: Alignment.centerRight,
@@ -561,7 +534,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                               onPressed: () {
                                 setState(() {
                                   _currentArtistIndex++;
-                                  _selectedVote = null; // Resetta il voto per il nuovo artista scelto
+                                  _selectedVote = null;
                                 });
                               },
                             ),
@@ -573,7 +546,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
               ),
               const SizedBox(height: 35),
 
-              // --- TESTI GUIDA VALUTAZIONE ---
               const Center(
                 child: Text(
                   "Come valuti questa performance?",
@@ -589,7 +561,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
               ),
               const SizedBox(height: 25),
 
-              // --- GRIGLIA DI VOTO 1-10 ---
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -626,57 +597,50 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
               ),
               const SizedBox(height: 35),
 
-              // --- BOTTONE GRADIENTE DI INVIO VOTO ---
               InkWell(
                 onTap: _selectedVote == null ? null : () async {
-  final String concorrenteId = artistId;
-  final double votoScelto = _selectedVote!.toDouble();
+                  final String concorrenteId = artistId;
+                  final double votoScelto = _selectedVote!.toDouble();
 
-  // 🚨 NOTA: Assicurati che qui ci sia scritto 'eventi' o 'events' 
-  // coerentemente con dove l'amministratore crea l'arena!
-  DocumentReference concorrenteRef = FirebaseFirestore.instance
-      .collection('eventi') 
-      .doc(widget.eventId)
-      .collection('concorrenti')
-      .doc(concorrenteId);
+                  DocumentReference concorrenteRef = FirebaseFirestore.instance
+                      .collection('eventi') 
+                      .doc(widget.eventId)
+                      .collection('concorrenti')
+                      .doc(concorrenteId);
 
-  try {
-    // 🚀 LA SVOLTA: Usiamo FieldValue.increment invece della transazione.
-    // Questo comando dice a Firestore: "Prendi il valore che c'è sul server e sommaci questo",
-    // in modo istantaneo e senza blocchi d'attesa.
-    await concorrenteRef.update({
-      'totaleSommaVoti': FieldValue.increment(votoScelto),
-      'numeroVoti': FieldValue.increment(1),
-    });
-    
-    // Feedback immediato a schermo
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Voto inviato con successo! Classifica aggiornata.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
+                  try {
+                    await concorrenteRef.update({
+                      'totaleSommaVoti': FieldValue.increment(votoScelto),
+                      'numeroVoti': FieldValue.increment(1),
+                    });
+                    
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Voto inviato con successo! Classifica aggiornata.'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
 
-    // Cambia schermata e resetta la selezione
-    setState(() {
-      _selectedIndex = 1; // Ti sposta sulla tab della Classifica Live
-      _selectedVote = null;
-    });
+                    // Cambia schermata e resetta la selezione
+                    setState(() {
+                      _selectedIndex = 2; // Sposta correttamente l'utente sulla Classifica Live
+                      _selectedVote = null;
+                    });
 
-  } catch (e) {
-    print("Errore immediato durante l'invio del voto: $e");
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Errore di scrittura: ${e.toString()}'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
-  }
-},
+                  } catch (e) {
+                    print("Errore immediato durante l'invio del voto: $e");
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Errore di scrittura: ${e.toString()}'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  }
+                },
                 child: Container(
                   width: double.infinity,
                   height: 55,
@@ -714,7 +678,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                 ),
               ),
               const SizedBox(height: 40),
-
               
               const SizedBox(height: 8),
               ClipRRect(
@@ -738,7 +701,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
       case 0:
         return _buildVotazioniLive();
       case 1:
-        return _buildScalettaLive();
+        return ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'spettatore');
       case 2:
         return _buildClassificaLive();
       case 3:
@@ -748,38 +711,49 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     }
   }
 
+  // =========================================================================
+  // METODO PRINCIPALE BUILD (RISOLVE L'ERRORE DELLA MANCANZA DI BUILD)
+  // =========================================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0F),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text("StageLive Spettatore", style: TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold)),
+      backgroundColor: const Color(0xFF0E0C15), // Sfondo scuro coerente con il design della tua app
+      body: SafeArea(
+        child: _buildBody(),
       ),
-      body: _buildBody(),
-      bottomNavigationBar: Theme(
-        data: Theme.of(context).copyWith(canvasColor: const Color(0xFF16161E)),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: const Color(0xFFD68BFF),
-          unselectedItemColor: Colors.white38,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontSize: 11),
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.how_to_vote_outlined), activeIcon: Icon(Icons.how_to_vote), label: "Votazioni"),
-            BottomNavigationBarItem(icon: Icon(Icons.queue_music_outlined), activeIcon: Icon(Icons.queue_music), label: "Scaletta"),
-            BottomNavigationBarItem(icon: Icon(Icons.leaderboard_outlined), activeIcon: Icon(Icons.leaderboard), label: "Classifica"),
-            BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: "Profilo"),
-          ],
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: const Color(0xFF16161E),
+        selectedItemColor: const Color(0xFFD68BFF),
+        unselectedItemColor: Colors.white38,
+        showUnselectedLabels: true,
+        selectedFontSize: 12,
+        unselectedFontSize: 12,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.how_to_vote),
+            label: 'Vota',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.queue_music),
+            label: 'Scaletta',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.leaderboard),
+            label: 'Classifica',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profilo',
+          ),
+        ],
       ),
     );
-  }
+  }  
 }

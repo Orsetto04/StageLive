@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
+import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
 // NOTA: Importa il file in cui si trova il WaitingScreen (es. 'events_view.dart')
 import 'EventsView.dart'; 
 
@@ -211,5 +213,125 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
       ),
       const SizedBox(height: 15),
     ]);
+  }
+}
+
+class EventCompetitorDashboard extends StatefulWidget {
+  final String eventId;
+  final String eventTitle;
+
+  const EventCompetitorDashboard({super.key, required this.eventId, required this.eventTitle});
+
+  @override
+  State<EventCompetitorDashboard> createState() => _EventCompetitorDashboardState();
+}
+
+class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> _tabs = [
+      ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'competitor'),
+      _buildListaConcorrentiView(),
+      ClassificaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle),
+      _buildProfiloView(),
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B0B0F),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(widget.eventTitle, style: const TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: _tabs[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        backgroundColor: const Color(0xFF16161E),
+        selectedItemColor: const Color(0xFFD68BFF),
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.queue_music), label: "Scaletta"),
+          BottomNavigationBarItem(icon: Icon(Icons.mic), label: "Concorrenti"),
+          BottomNavigationBarItem(icon: Icon(Icons.leaderboard), label: "Classifica"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profilo"),
+        ],
+      ),
+    );
+  }
+
+  
+
+  Widget _buildListaConcorrentiView() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('candidature')
+          .where('eventId', isEqualTo: widget.eventId)
+          .where('status', whereIn: ['APPROVATA', 'ACCETTATA', 'CONFERMATO'])
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Center(child: Text("Nessun concorrente nel cast", style: TextStyle(color: Colors.grey)));
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            var data = docs[index].data() as Map<String, dynamic>;
+            String nome = data['nome'] ?? data['username'] ?? 'Concorrente';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
+              child: Row(
+                children: [
+                  const Icon(Icons.star, color: Color(0xFFD68BFF), size: 24),
+                  const SizedBox(width: 15),
+                  Text(nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+ 
+
+  Widget _buildProfiloView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(30),
+        child: Container(
+          padding: const EdgeInsets.all(25),
+          decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFD68BFF).withOpacity(0.3))),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.account_circle, size: 80, color: Color(0xFFD68BFF)),
+              const SizedBox(height: 15),
+              const Text("Il Tuo Profilo", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFFD68BFF).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                child: const Text("CONCORRENTE NEL CAST", style: TextStyle(color: Color(0xFFD68BFF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+              ),
+              const SizedBox(height: 25),
+              const Text("Sezione profilo in fase di sviluppo. Qui potrai gestire le tue tracce e i tuoi dettagli social!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
