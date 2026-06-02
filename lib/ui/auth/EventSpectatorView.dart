@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // AGGIUNTO: Per identificare lo spettatore unico
 import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
 
 class EventSpectatorView extends StatefulWidget {
@@ -16,11 +17,47 @@ class EventSpectatorView extends StatefulWidget {
 }
 
 class _EventSpectatorViewState extends State<EventSpectatorView> {
-  // Default su 0 (Votazioni) così si apre direttamente sulla schermata di voto!
   int _selectedIndex = 0; 
   int? _selectedVote;
-  // Tiene traccia di quale artista della lista stiamo guardando/votando
   int _currentArtistIndex = 0; 
+
+  // AGGIUNTI PER LA PERSISTENZA DIRETTA SU FIRESTORE
+  bool _isLoadingVoti = true; // Evita il flash della lista prima del caricamento dei vecchi voti
+  final List<String> _votedConcorrentiIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _caricaVotiPrecedenti(); // AGGIUNTO: Carica i voti salvati nel DB appena si apre la schermata
+  }
+
+  // AGGIUNTO: Recupera la lista dei concorrenti già votati da Firestore
+  Future<void> _caricaVotiPrecedenti() async {
+    try {
+      final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
+      
+      final doc = await FirebaseFirestore.instance
+          .collection('eventi')
+          .doc(widget.eventId)
+          .collection('voti_spettatori')
+          .doc(userId)
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
+        final List<dynamic>? votati = data['concorrentiVotati'];
+        if (votati != null) {
+          _votedConcorrentiIds.addAll(votati.map((e) => e.toString()));
+        }
+      }
+    } catch (e) {
+      print("Errore nel caricamento dei voti precedenti: $e");
+    } finally {
+      setState(() {
+        _isLoadingVoti = false; // Fine caricamento iniziale
+      });
+    }
+  }
 
   // --- SCHERMATA SCALETTA LIVE ---
   Widget _buildScalettaLive() {
@@ -87,13 +124,11 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
           return const Center(child: Text("Nessun concorrente in gara.", style: TextStyle(color: Colors.white)));
         }
 
-        // 1. Mappiamo i documenti di Firestore in una lista locale
         List<Map<String, dynamic>> listaConcorrenti = snapshot.data!.docs.map((doc) {
           var data = doc.data() as Map<String, dynamic>;
           double totale = data['totaleSommaVoti']?.toDouble() ?? 0.0;
           int voti = data['numeroVoti']?.toInt() ?? 0;
           
-          // Calcoliamo la media matematica al volo (Evita divisioni per zero)
           double media = voti > 0 ? (totale / voti) : 0.0;
 
           return {
@@ -105,10 +140,8 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
           };
         }).toList();
 
-        // 2. ORDINA LA LISTA: Dal voto medio più alto al più basso
         listaConcorrenti.sort((a, b) => b['media'].compareTo(a['media']));
 
-        // Assegniamo i primi tre posti del podio in base dei dati reali (se presenti)
         var primo = listaConcorrenti.length > 0 ? listaConcorrenti[0] : null;
         var secondo = listaConcorrenti.length > 1 ? listaConcorrenti[1] : null;
         var terzo = listaConcorrenti.length > 2 ? listaConcorrenti[2] : null;
@@ -135,12 +168,10 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
               ),
               const SizedBox(height: 35),
 
-              // --- IL PODIO DINAMICO (#2, #1, #3) ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // SECONDO POSTO
                   Expanded(
                     child: secondo != null 
                       ? _buildPodiumItem(
@@ -155,7 +186,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                       : const SizedBox(),
                   ),
                   const SizedBox(width: 8),
-                  // PRIMO POSTO
                   Expanded(
                     child: primo != null 
                       ? _buildPodiumItem(
@@ -171,7 +201,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                       : const SizedBox(),
                   ),
                   const SizedBox(width: 8),
-                  // TERZO POSTO
                   Expanded(
                     child: terzo != null 
                       ? _buildPodiumItem(
@@ -189,7 +218,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
               ),
               const SizedBox(height: 40),
 
-              // --- SEZIONE TOP PERFORMER (#4 in poi) ---
               Row(
                 children: [
                   const Text('TOP PERFORMER', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
@@ -199,10 +227,9 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
               ),
               const SizedBox(height: 16),
 
-              // Generazione dinamica dal 4° posto in giù usando un ciclo For
               if (listaConcorrenti.length > 3)
                 ...listaConcorrenti.sublist(3).asMap().entries.map((entry) {
-                  int index = entry.key + 4; // Parte dalla posizione 4
+                  int index = entry.key + 4; 
                   var concorrente = entry.value;
                   return _buildListRow(
                     index.toString(),
@@ -220,7 +247,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
 
               const SizedBox(height: 40),
 
-              // --- SEZIONE CALL TO ACTION FINALE ---
               Center(
                 child: Column(
                   children: [
@@ -239,7 +265,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                       child: ElevatedButton(
                         onPressed: () {
                           setState(() {
-                            _selectedIndex = 0; // Riporta alla schermata di voto
+                            _selectedIndex = 0; 
                           });
                         },
                         style: ElevatedButton.styleFrom(
@@ -371,6 +397,11 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
 
   // --- SCHERMATA VOTAZIONI LIVE (OTTIMIZZATA MULTI-CONCORRENTE) ---
   Widget _buildVotazioniLive() {
+    // AGGIUNTO: Se stiamo caricando i voti passati dal DB, mostra il caricamento per evitare sfarfallii
+    if (_isLoadingVoti) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+    }
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('eventi')
@@ -392,7 +423,17 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
           );
         }
 
-        final docs = snapshot.data!.docs;
+        final allDocs = snapshot.data!.docs;
+        final docs = allDocs.where((doc) => !_votedConcorrentiIds.contains(doc.id)).toList();
+
+        if (docs.isEmpty) {
+          return const Center(
+            child: Text(
+              "Hai già votato tutti i concorrenti disponibili!",
+              style: TextStyle(color: Colors.grey, fontSize: 15),
+            ),
+          );
+        }
         
         if (_currentArtistIndex >= docs.length) {
           _currentArtistIndex = 0;
@@ -601,6 +642,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                 onTap: _selectedVote == null ? null : () async {
                   final String concorrenteId = artistId;
                   final double votoScelto = _selectedVote!.toDouble();
+                  final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
 
                   DocumentReference concorrenteRef = FirebaseFirestore.instance
                       .collection('eventi') 
@@ -608,12 +650,25 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                       .collection('concorrenti')
                       .doc(concorrenteId);
 
+                  // Riferimento al documento in cui salviamo la cronologia di voto dello spettatore per questo evento
+                  DocumentReference spettatoreVotiRef = FirebaseFirestore.instance
+                      .collection('eventi')
+                      .doc(widget.eventId)
+                      .collection('voti_spettatori')
+                      .doc(userId);
+
                   try {
+                    // 1. Aggiorna i voti totali del concorrente
                     await concorrenteRef.update({
                       'totaleSommaVoti': FieldValue.increment(votoScelto),
                       'numeroVoti': FieldValue.increment(1),
                     });
                     
+                    // 2. MODIFICATO / AGGIUNTO: Salva permanentemente l'ID del concorrente nel DB sotto il profilo dello spettatore
+                    await spettatoreVotiRef.set({
+                      'concorrentiVotati': FieldValue.arrayUnion([concorrenteId])
+                    }, SetOptions(merge: true));
+
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -623,9 +678,9 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                       );
                     }
 
-                    // Cambia schermata e resetta la selezione
                     setState(() {
-                      _selectedIndex = 2; // Sposta correttamente l'utente sulla Classifica Live
+                      _votedConcorrentiIds.add(artistId); 
+                      _selectedIndex = 2; 
                       _selectedVote = null;
                     });
 
@@ -696,22 +751,134 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     );
   }
 
-  Widget _buildBody() {
-    switch (_selectedIndex) {
-      case 0:
-        return _buildVotazioniLive();
-      case 1:
-        return ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'spettatore');
-      case 2:
-        return _buildClassificaLive();
-      case 3:
-        return const Center(child: Text("Profilo Spettatore\n(Schermata in arrivo)", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 16)));
-      default:
-        return _buildVotazioniLive();
-    }
-  }
+ 
 
-  // =========================================================================
+
+
+  
+
+
+
+Widget _buildProfiloSpettatore(BuildContext context, {
+  required String nome,
+  required String cognome,
+  required String username,
+}) {
+  // Recupera in automatico la famiglia di font globale dell'app
+  final String? appFontFamily = Theme.of(context).textTheme.bodyLarge?.fontFamily;
+
+  // Stile base per coerenza visiva e di font
+  final TextStyle baseTextStyle = TextStyle(
+    fontFamily: appFontFamily,
+    color: Colors.black87,
+  );
+
+  return SingleChildScrollView(
+    physics: const BouncingScrollPhysics(),
+    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        
+        // ==========================================
+        // 1. HERO SECTION (AVATAR CON ICONA E BADGE)
+        // ==========================================
+        Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4.0),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [Colors.blueAccent, Colors.purpleAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: CircleAvatar(
+                radius: 55,
+                backgroundColor: Colors.grey[100], // Sfondo neutro dietro l'icona
+                child: Icon(
+                  Icons.person_rounded, // Icona utente invece della foto
+                  size: 65,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+            Container(
+              transform: Matrix4.translationValues(0.0, 10.0, 0.0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.purpleAccent,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Text(
+                'SPETTATORE 🔥',
+                style: baseTextStyle.copyWith(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        
+       
+        Text(
+          '$nome',
+          textAlign: TextAlign.center,
+          style: baseTextStyle.copyWith(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        
+       
+        
+            ]
+      
+    )
+  );
+}
+
+
+
+// Helper interno per generare le singole colonne delle statistiche
+
+
+// Helper interno per generare i chip/tag grafici degli interessi
+Widget _buildTag(String text, TextStyle baseStyle) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.grey[200],
+      borderRadius: BorderRadius.circular(30),
+    ),
+    child: Text(
+      text,
+      style: baseStyle.copyWith(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: Colors.grey[800],
+      ),
+    ),
+  );
+}
+
+// =========================================================================
   // METODO PRINCIPALE BUILD (RISOLVE L'ERRORE DELLA MANCANZA DI BUILD)
   // =========================================================================
   @override
@@ -756,4 +923,21 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
       ),
     );
   }  
+
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildVotazioniLive();
+      case 1:
+        return ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'spettatore');
+      case 2:
+        return _buildClassificaLive();
+      case 3:
+        return _buildProfiloSpettatore(context, nome: '', cognome: '', username: '');
+      default:
+        return _buildVotazioniLive();
+    }
+  }
+
+  
 }

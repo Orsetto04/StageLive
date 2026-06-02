@@ -146,29 +146,7 @@ class _ScalettaLiveViewState extends State<ScalettaLiveView> {
                       onTap: () => _showAddPerformanceDialog(context),
                     ),
                     const SizedBox(height: 15),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _bottomMenuButton(
-                            label: "Salva Modifiche",
-                            icon: Icons.save,
-                            iconColor: _isOrderChanged ? const Color(0xFFD68BFF) : Colors.grey,
-                            backgroundColor: _isOrderChanged ? const Color(0xFF1F1B2E) : const Color(0xFF16161E),
-                            onTap: _isOrderChanged ? _salvaNuovoOrdine : null,
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Container(
-                          height: 55, width: 55,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF4B72),
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: const Color(0xFFFF4B72).withOpacity(0.3), blurRadius: 15, spreadRadius: 2)]
-                          ),
-                          child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
-                        )
-                      ],
-                    ),
+                    
                   ],
                 ),
               )
