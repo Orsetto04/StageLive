@@ -28,7 +28,7 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _luogoController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
-
+  final TextEditingController _branoController = TextEditingController();
   // Controller Social (Facoltativi)
   final TextEditingController _instagramController = TextEditingController();
   final TextEditingController _tiktokController = TextEditingController();
@@ -63,8 +63,9 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
     setState(() => _isSending = true);
 
     try {
+      // SALVATAGGIO NEL DATABASE: Qui vengono salvati tutti i dati inseriti nel form
       await FirebaseFirestore.instance.collection('candidature').add({
-        'eventId': widget.eventId, // MODIFICATO: Salva l'evento specifico per cui ci si candida
+        'eventId': widget.eventId, 
         'uid': FirebaseAuth.instance.currentUser?.uid,
         'nomeArte': _nomeArteController.text.trim(),
         'genere': _selectedGenre,
@@ -76,6 +77,7 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
         'email': _emailController.text.trim(),
         'dataNascita': _dateController.text,
         'luogoNascita': _luogoController.text.trim(),
+        'brano': _branoController.text.trim(),
         // Social (possono essere vuoti)
         'instagram': _instagramController.text.trim(),
         'tiktok': _tiktokController.text.trim(),
@@ -128,18 +130,25 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
             _buildCardContainer("Informazioni Artistiche *", Icons.mic, [
               _buildInput("NOME D'ARTE *", "Es. Luna Stark", _nomeArteController),
               _buildDropdown(),
-              _buildInput("DESCRIZIONE STILE", "Parlaci del tuo sound...", _descrizioneController, lines: 3),
+              _buildInput("PARLACI UN PO' DI TE... *", "Parlaci del tuo sound...", _descrizioneController, lines: 3),
+              _buildInput("CHE BRANO PORTERAI? * (Brano - Artista/Gruppo/Inedito)", "Es. \"Bohemian Rhapsody\" - Queen", _branoController, lines: 3),
             ]),
 
             _buildCardContainer("Dati Anagrafici *", Icons.badge, [
               _buildInput("NOME *", "", _nomeController),
               _buildInput("COGNOME *", "", _cognomeController),
-              _buildInput("CODICE FISCALE *", "", _cfController, onChanged: (v) {
-                RegExp regExp = RegExp(r'^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$');
-                setState(() => _cfError = (v.isEmpty || regExp.hasMatch(v.toUpperCase())) ? null : "Codice Fiscale non valido");
+              _buildInput("DATA DI NASCITA (GG/MM/AAAA)", "Es. 31/12/1999", _dateController, onChanged: (v) {
+                try {
+                  DateFormat('dd/MM/yyyy').parseStrict(v);
+                  setState(() => _cfError = null);
+                } catch (_) {
+                  setState(() => _cfError = "Formato data non valido");
+                }
               }),
               if (_cfError != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_cfError!, style: const TextStyle(color: Colors.red, fontSize: 11))),
               _buildInput("LUOGO DI NASCITA", "", _luogoController),
+              _buildInput("EMAIL *", "es. tuo@email.com", _emailController),
+              _buildInput("TELEFONO *", "Es. +39 123 456 7890", _telefonoController),
             ]),
 
             _buildCardContainer("Social (Opzionale)", Icons.share, [
@@ -234,8 +243,8 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     final List<Widget> _tabs = [
       ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'competitor'),
       _buildListaConcorrentiView(),
-      ClassificaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle),
-      _buildProfiloView(),
+      ClassificaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, userRole: 'competitor'),
+      _buildProfiloView(context), 
     ];
 
     return Scaffold(
@@ -243,7 +252,13 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(widget.eventTitle, style: const TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.eventTitle, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("PANNELLO CONCORRENTE", style: TextStyle(color: Color(0xFFD68BFF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+          ],
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -267,8 +282,7 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     );
   }
 
-  
-
+  // 🌟 VISTA LISTA CONCORRENTI AGGIORNATA (Cliccabile per visualizzare SOLO il brano)
   Widget _buildListaConcorrentiView() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -286,17 +300,36 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
           itemCount: docs.length,
           itemBuilder: (context, index) {
             var data = docs[index].data() as Map<String, dynamic>;
-            String nome = data['nome'] ?? data['username'] ?? 'Concorrente';
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
-              child: Row(
-                children: [
-                  const Icon(Icons.star, color: Color(0xFFD68BFF), size: 24),
-                  const SizedBox(width: 15),
-                  Text(nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                ],
+            // Usiamo il nome d'arte se presente, altrimenti il nome o lo username
+            String nome = data['nomeArte'] ?? data['nome'] ?? data['username'] ?? 'Concorrente';
+            String brano = data['brano'] ?? 'Nessun brano specificato';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: InkWell(
+                onTap: () => _mostraBranoConcorrente(context, nome, brano), // 🌟 Mostra solo il brano al click
+                borderRadius: BorderRadius.circular(15),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16161E), 
+                    borderRadius: BorderRadius.circular(15), 
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.star, color: Color(0xFFD68BFF), size: 24),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Text(
+                          nome, 
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const Icon(Icons.music_note, color: Colors.white24, size: 20), // Icona nota musicale come indizio di click
+                    ],
+                  ),
+                ),
               ),
             );
           },
@@ -305,32 +338,145 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     );
   }
 
- 
-
-  Widget _buildProfiloView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(30),
-        child: Container(
+  // 🌟 FUNZIONE DI SUPPORTO: Mostra un BottomSheet minimale con il SOLO brano del concorrente
+  void _mostraBranoConcorrente(BuildContext context, String nome, String brano) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF16161E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        return Padding(
           padding: const EdgeInsets.all(25),
-          decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFD68BFF).withOpacity(0.3))),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.account_circle, size: 80, color: Color(0xFFD68BFF)),
-              const SizedBox(height: 15),
-              const Text("Il Tuo Profilo", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 5),
+              // Linea estetica superiore
+              Center(
+                child: Container(
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Nome del concorrente cliccato
+              Text(
+                nome,
+                style: const TextStyle(color: Color(0xFFD68BFF), fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              
+              const Text(
+                "BRANO IN SCALETTA",
+                style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
+              const SizedBox(height: 8),
+              
+              // Box contenente SOLO il brano
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(color: const Color(0xFFD68BFF).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: const Text("CONCORRENTE NEL CAST", style: TextStyle(color: Color(0xFFD68BFF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B0B0F),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.audiotrack, color: Color(0xFFD68BFF), size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        brano,
+                        style: const TextStyle(
+                          color: Colors.white, 
+                          fontSize: 15, 
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 25),
-              const Text("Sezione profilo in fase di sviluppo. Qui potrai gestire le tue tracce e i tuoi dettagli social!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5)),
+
+              // Pulsante Chiudi
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0B0B0F),
+                    side: const BorderSide(color: Colors.white10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "CHIUDI",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfiloView(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(30),
+      child: Column(
+        children: [
+          // 🌟 Card Profilo del Concorrente
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 25),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16161E), 
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(color: const Color(0xFFD68BFF).withOpacity(0.3)),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.stars_rounded, 
+                  size: 80, 
+                  color: Color(0xFFD68BFF),
+                ),
+                const SizedBox(height: 20),
+                
+                // Badge "CONCORRENTE"
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD68BFF).withOpacity(0.1), 
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    "CONCORRENTE", 
+                    style: TextStyle(
+                      color: Color(0xFFD68BFF), 
+                      fontSize: 11, 
+                      fontWeight: FontWeight.bold, 
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

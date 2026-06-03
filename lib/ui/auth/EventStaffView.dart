@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:stagelive/services/auth_service.dart';
 import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
 import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
+import 'EventsView.dart';
+
 
 class EventStaffDashboard extends StatefulWidget {
   final String eventId;
@@ -254,8 +256,8 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
     final List<Widget> _tabs = [
       ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'staff'),
       _buildListaConcorrentiView(),
-      ClassificaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle),
-      _buildProfiloView(),
+      ClassificaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, userRole: 'staff',),
+      _buildProfiloStaff(),
     ];
 
     return Scaffold(
@@ -275,7 +277,7 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _tabs[_currentIndex],
+    body: _tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
@@ -288,6 +290,7 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
           BottomNavigationBarItem(icon: Icon(Icons.people), label: "Concorrenti"),
           BottomNavigationBarItem(icon: Icon(Icons.leaderboard), label: "Classifica"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profilo"),
+
         ],
       ),
     );
@@ -343,6 +346,7 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
   }
 
   // 2. LISTA CONCORRENTI
+ // 2. LISTA CONCORRENTI AGGIORNATA (Cliccabile con vista dettagli)
   Widget _buildListaConcorrentiView() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -361,68 +365,38 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
           itemBuilder: (context, index) {
             var data = docs[index].data() as Map<String, dynamic>;
             String nome = data['nome'] ?? data['username'] ?? 'Concorrente';
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
-              child: Row(
-                children: [
-                  const Icon(Icons.star_border, color: Color(0xFFD68BFF), size: 24),
-                  const SizedBox(width: 15),
-                  Text(nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+            String brano = data['brano'] ?? 'Nessun brano specificato';
 
-  // 3. CLASSIFICA LIVE
-  Widget _buildClassificaView() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('candidature')
-          .where('eventId', isEqualTo: widget.eventId)
-          .where('status', whereIn: ['APPROVATA', 'ACCETTATA', 'CONFERMATO'])
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
-        final docs = snapshot.data!.docs;
-        if (docs.isEmpty) return const Center(child: Text("Classifica non ancora disponibile", style: TextStyle(color: Colors.grey)));
-
-        var sortedDocs = docs.toList()..sort((a, b) {
-          var dataA = a.data() as Map<String, dynamic>;
-          var dataB = b.data() as Map<String, dynamic>;
-          int votiA = dataA['voti'] ?? 0;
-          int votiB = dataB['voti'] ?? 0;
-          return votiB.compareTo(votiA);
-        });
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(20),
-          itemCount: sortedDocs.length,
-          itemBuilder: (context, index) {
-            var data = sortedDocs[index].data() as Map<String, dynamic>;
-            String nome = data['nome'] ?? data['username'] ?? 'Artista';
-            int voti = data['voti'] ?? 0;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(15)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: InkWell(
+                onTap: () => _mostraDettagliConcorrente(context, data), // 🌟 Apre il dettaglio al click
+                borderRadius: BorderRadius.circular(15),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16161E), 
+                    borderRadius: BorderRadius.circular(15), 
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
                     children: [
-                      Text("#${index + 1}", style: TextStyle(color: index < 3 ? const Color(0xFFD68BFF) : Colors.grey, fontWeight: FontWeight.bold, fontSize: 16)),
+                      const Icon(Icons.star_border, color: Color(0xFFD68BFF), size: 24),
                       const SizedBox(width: 15),
-                      Text(nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(brano, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16), // Indicatore visivo di click
                     ],
                   ),
-                  Text("$voti Punti", style: const TextStyle(color: Color(0xFFD68BFF), fontWeight: FontWeight.bold)),
-                ],
+                ),
               ),
             );
           },
@@ -431,40 +405,192 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
     );
   }
 
-  // 4. PROFILO STAFF (Grafica coordinata)
-  Widget _buildProfiloView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(30),
-        child: Container(
-          padding: const EdgeInsets.all(25),
+  // 🌟 FUNZIONE DI SUPPORTO: Mostra il BottomSheet con tutti i dettagli della candidatura
+  void _mostraDettagliConcorrente(BuildContext context, Map<String, dynamic> data) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF16161E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        String nome = data['nome'] ?? 'Non specificato';
+        String brano = data['brano'] ?? 'Non specificato';
+        String descrizione = data['descrizione'] ?? 'Nessuna descrizione o biografia fornita.';
+        String email = data['email'] ?? 'Non specificata';
+        String status = data['status'] ?? 'Nessuno';
+
+        return Padding(
+          padding: EdgeInsets.only(
+            top: 20,
+            left: 25,
+            right: 25,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 30,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Linea centrale estetica del BottomSheet
+                Center(
+                  child: Container(
+                    width: 50,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Intestazione
+                const Row(
+                  children: [
+                    Icon(Icons.assignment_ind_outlined, color: Color(0xFFD68BFF)),
+                    SizedBox(width: 10),
+                    Text(
+                      "SCHEDA DETTAGLIATA CONCORRENTE",
+                      style: TextStyle(
+                        color: Color(0xFFD68BFF),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 25),
+
+                // Lista delle info organizzata
+                _buildDetailRow("Nome Completo:", nome),
+                _buildDetailRow("Brano:", brano),
+                _buildDetailRow("Email:", email),
+                _buildDetailRow("Stato Attuale:", status),
+                
+                const SizedBox(height: 15),
+                const Text(
+                  "Descrizione / Presentazione:",
+                  style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                
+                // Box dedicato alla descrizione estesa
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B0B0F),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Text(
+                    descrizione,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+                  ),
+                ),
+                const SizedBox(height: 25),
+
+                // Pulsante di chiusura
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0B0B0F),
+                      side: const BorderSide(color: Colors.white10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      "CHIUDI SCHEDA",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Widget riutilizzabile per formattare le righe chiave-valore nel popup dei dettagli
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "$label ",
+            style: const TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfiloStaff() {
+  return SingleChildScrollView(
+    physics: const BouncingScrollPhysics(),
+    padding: const EdgeInsets.all(30),
+    child: Column(
+      children: [
+        // 🛠️ Card Profilo dello Staff
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 25),
           decoration: BoxDecoration(
-            color: const Color(0xFF16161E), 
-            borderRadius: BorderRadius.circular(20), 
-            border: Border.all(color: const Color(0xFFD68BFF).withOpacity(0.3))
+            color: const Color(0xFF16161E), // Stesso sfondo scuro
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: const Color(0xFFD68BFF).withOpacity(0.3)),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.badge_outlined, size: 80, color: Color(0xFFD68BFF)),
-              const SizedBox(height: 15),
-              const Text("Profilo Staff", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 5),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(color: const Color(0xFFD68BFF).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: const Text("MEMBRO DELLO STAFF", style: TextStyle(color: Color(0xFFD68BFF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+              // Icona Badge/Pass Identificativo dello Staff
+              const Icon(
+                Icons.badge_rounded, 
+                size: 80, 
+                color: Color(0xFFD68BFF),
               ),
-              const SizedBox(height: 25),
-              const Text(
-                "In questa sezione potrai vedere i tuoi dettagli di servizio e i permessi assegnati dall'amministratore per la gestione dell'evento.", 
-                textAlign: TextAlign.center, 
-                style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5)
+              const SizedBox(height: 20),
+             
+              
+              // Badge "STAFF"
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD68BFF).withOpacity(0.1), 
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  "STAFF", 
+                  style: TextStyle(
+                    color: Color(0xFFD68BFF), 
+                    fontSize: 11, 
+                    fontWeight: FontWeight.bold, 
+                    letterSpacing: 1.5,
+                  ),
+                ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
+
+
+ 
 }

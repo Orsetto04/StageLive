@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // AGGIUNTO: Per identificare lo spettatore unico
+import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
 import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
 
 class EventSpectatorView extends StatefulWidget {
@@ -761,96 +762,55 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
 
 Widget _buildProfiloSpettatore(BuildContext context, {
   required String nome,
-  required String cognome,
-  required String username,
 }) {
-  // Recupera in automatico la famiglia di font globale dell'app
-  final String? appFontFamily = Theme.of(context).textTheme.bodyLarge?.fontFamily;
-
-  // Stile base per coerenza visiva e di font
-  final TextStyle baseTextStyle = TextStyle(
-    fontFamily: appFontFamily,
-    color: Colors.black87,
-  );
-
   return SingleChildScrollView(
     physics: const BouncingScrollPhysics(),
-    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+    padding: const EdgeInsets.all(30),
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        
-        // ==========================================
-        // 1. HERO SECTION (AVATAR CON ICONA E BADGE)
-        // ==========================================
-        Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4.0),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [Colors.blueAccent, Colors.purpleAccent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+        // 🌟 Card Profilo dello Spettatore (Stile speculare a quello Admin)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 25),
+          decoration: BoxDecoration(
+            color: const Color(0xFF16161E), // Sfondo scuro come da foto
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: const Color(0xFFD68BFF).withOpacity(0.3)),
+          ),
+          child: Column(
+            children: [
+              // Icona del Profilo (Colore viola coordinato)
+              const Icon(
+                Icons.account_circle_rounded, 
+                size: 80, 
+                color: Color(0xFFD68BFF),
               ),
-              child: CircleAvatar(
-                radius: 55,
-                backgroundColor: Colors.grey[100], // Sfondo neutro dietro l'icona
-                child: Icon(
-                  Icons.person_rounded, // Icona utente invece della foto
-                  size: 65,
-                  color: Colors.grey[600],
+              const SizedBox(height: 20),
+              
+             
+              
+              // Badge "SPETTATORE" (Stile "PROPRIETARIO EVENTO" della foto)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD68BFF).withOpacity(0.1), 
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ),
-            ),
-            Container(
-              transform: Matrix4.translationValues(0.0, 10.0, 0.0),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.purpleAccent,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
+                child: const Text(
+                  "SPETTATORE", 
+                  style: TextStyle(
+                    color: Color(0xFFD68BFF), 
+                    fontSize: 11, 
+                    fontWeight: FontWeight.bold, 
+                    letterSpacing: 1.5,
                   ),
-                ],
-              ),
-              child: Text(
-                'SPETTATORE 🔥',
-                style: baseTextStyle.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        
-       
-        Text(
-          '$nome',
-          textAlign: TextAlign.center,
-          style: baseTextStyle.copyWith(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        
-       
-        
-            ]
-      
-    )
+      ],
+    ),
   );
 }
 
@@ -884,7 +844,22 @@ Widget _buildTag(String text, TextStyle baseStyle) {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0C15), // Sfondo scuro coerente con il design della tua app
+      backgroundColor: const Color(0xFF0E0C15), 
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.eventTitle, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("PANNELLO SPETTATORE", style: TextStyle(color: Color(0xFFD68BFF), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+          ],
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: _buildBody(),
       ),
@@ -931,9 +906,9 @@ Widget _buildTag(String text, TextStyle baseStyle) {
       case 1:
         return ScalettaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, ruolo: 'spettatore');
       case 2:
-        return _buildClassificaLive();
+        return ClassificaLiveView(eventId: widget.eventId, eventTitle: widget.eventTitle, userRole: 'spettatore');
       case 3:
-        return _buildProfiloSpettatore(context, nome: '', cognome: '', username: '');
+        return _buildProfiloSpettatore(context, nome: '');
       default:
         return _buildVotazioniLive();
     }
