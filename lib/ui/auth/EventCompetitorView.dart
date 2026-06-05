@@ -46,9 +46,7 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
     if (_nomeArteController.text.isEmpty || 
         _selectedGenre == null || 
         _nomeController.text.isEmpty || 
-        _cognomeController.text.isEmpty || 
-        _cfController.text.isEmpty || 
-        _cfError != null) {
+        _cognomeController.text.isEmpty ) {
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -138,14 +136,11 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
               _buildInput("NOME *", "", _nomeController),
               _buildInput("COGNOME *", "", _cognomeController),
               _buildInput("DATA DI NASCITA (GG/MM/AAAA)", "Es. 31/12/1999", _dateController, onChanged: (v) {
-                try {
+                
                   DateFormat('dd/MM/yyyy').parseStrict(v);
-                  setState(() => _cfError = null);
-                } catch (_) {
-                  setState(() => _cfError = "Formato data non valido");
-                }
+                  
+                
               }),
-              if (_cfError != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_cfError!, style: const TextStyle(color: Colors.red, fontSize: 11))),
               _buildInput("LUOGO DI NASCITA", "", _luogoController),
               _buildInput("EMAIL *", "es. tuo@email.com", _emailController),
               _buildInput("TELEFONO *", "Es. +39 123 456 7890", _telefonoController),

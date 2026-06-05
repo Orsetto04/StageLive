@@ -239,10 +239,90 @@ class _EventsViewState extends State<EventsView> {
               }),
               const SizedBox(height: 15),
               
-              _roleButton(context, "Candidati come Concorrente", Icons.mic, const Color(0xFFD68BFF), () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (context) => EventCompetitorView(eventId: eventId)));
+              // 🔥 MODIFICATO: Controllo dinamico dello stato delle candidature prima dell'accesso
+              _roleButton(context, "Candidati come Concorrente", Icons.mic, const Color(0xFFD68BFF), () async {
+                try {
+                  // Recuperiamo il documento dell'evento in tempo reale al clic
+                  var eventDoc = await FirebaseFirestore.instance
+                      .collection('eventi')
+                      .doc(eventId)
+                      .get();
+
+                  bool candidatureAperte = eventDoc.data()?['isCandidatureAperte'] ?? false;
+
+                  if (!context.mounted) return;
+
+                  if (candidatureAperte) {
+                    // SE APERTE: Entra normalmente nella schermata di candidatura
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => EventCompetitorView(eventId: eventId)));
+                  } else {
+                    // SE CHIUSE: Chiude il foglio di scelta e mostra l'avviso di blocco
+                    Navigator.pop(context);
+                    _showCandidatureChiuseBottomSheet(context);
+                  }
+                } catch (e) {
+                  print("Errore durante il controllo delle candidature: $e");
+                }
               }, textColor: Colors.black),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 🛑 NUOVA SCHERMATA: Mostra l'avviso grafico quando le candidature sono bloccate
+  void _showCandidatureChiuseBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF16161E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF7B93).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.block_outlined,
+                  color: Color(0xFFFF7B93), // Rosso/Rosa acceso coerente
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Candidature Chiuse",
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Siamo spiacenti, le iscrizioni come concorrente per questo evento sono state ufficialmente chiuse dall'organizzatore.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF22222B),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "HO CAPITO",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1),
+                  ),
+                ),
+              ),
             ],
           ),
         );

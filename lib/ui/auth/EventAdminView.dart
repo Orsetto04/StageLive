@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
 import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
 
+
 class EventAdminView extends StatefulWidget {
   final String eventId;
   final String eventTitle;
@@ -96,7 +97,7 @@ class _EventAdminViewState extends State<EventAdminView> {
     );
   }
 
-  Widget _buildProfiloAdmin() {
+ Widget _buildProfiloAdmin() {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance.collection('eventi').doc(widget.eventId).snapshots(),
       builder: (context, snapshot) {
@@ -109,6 +110,12 @@ class _EventAdminViewState extends State<EventAdminView> {
         
         // Sincronizzazione dello stato della classifica dal DB
         bool isClassificaPubblicata = data?['isRankingPublished'] ?? false;
+        
+        // Sincronizzazione dello stato del televoto dal DB
+        bool isTelevotoAperto = data?['isTelevotoAperto'] ?? false;
+
+        // Sincronizzazione dello stato delle candidature dal DB
+        bool isCandidatureAperte = data?['isCandidatureAperte'] ?? false;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(30),
@@ -300,6 +307,152 @@ class _EventAdminViewState extends State<EventAdminView> {
                   ],
                 ),
               ),
+              const SizedBox(height: 25),
+
+           
+        
+             // 🔥 SEZIONE: Gestione Televoto (Cambia dinamicamente come la classifica!)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(25),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16161E),
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.how_to_vote_outlined, color: Color(0xFFD68BFF), size: 20),
+                        SizedBox(width: 10),
+                        Text(
+                          "Televoto Evento",
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    Text(
+                      isTelevotoAperto 
+                          ? "Il televoto è attualmente APERTO a tutti i partecipanti dell'evento."
+                          : "Il televoto è CHIUSO. Clicca il pulsante qui sotto per aprirlo e consentire le votazioni.",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: 25),
+                    
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          // Se è aperto diventa scuro, se è chiuso diventa viola pieno
+                          backgroundColor: isTelevotoAperto ? const Color(0xFF221526) : const Color(0xFFD68BFF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            side: isTelevotoAperto 
+                                ? const BorderSide(color: Colors.redAccent, width: 1) 
+                                : BorderSide.none,
+                          ),
+                        ),
+                        onPressed: () => _gestisciTelevoto(isTelevotoAperto),
+                        icon: Icon(
+                          // Cambia anche l'icona in base allo stato
+                          isTelevotoAperto ? Icons.gavel_outlined : Icons.how_to_vote, 
+                          color: isTelevotoAperto ? Colors.redAccent : Colors.black,
+                        ),
+                        label: Text(
+                          // Cambia il testo del pulsante in base allo stato
+                          isTelevotoAperto ? "STOP AL TELEVOTO" : "APRI IL TELEVOTO",
+                          style: TextStyle(
+                            color: isTelevotoAperto ? Colors.redAccent : Colors.black, 
+                            fontWeight: FontWeight.bold, 
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+
+           
+           
+           
+           
+           
+            Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(25),
+  decoration: BoxDecoration(
+    color: const Color(0xFF16161E),
+    borderRadius: BorderRadius.circular(25),
+    border: Border.all(color: Colors.white10),
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.assignment_ind_outlined, color: Color(0xFFD68BFF), size: 20),
+          SizedBox(width: 10),
+          Text(
+            "Candidature Evento",
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+      const SizedBox(height: 15),
+      Text(
+        isCandidatureAperte 
+            ? "Le candidature sono attualmente APERTE. I concorrenti possono inviare la loro iscrizione all'evento."
+            : "Le candidature sono CHIUSE. Clicca il pulsante qui sotto per aprirle e consentire le iscrizioni.",
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
+      ),
+      const SizedBox(height: 25),
+      
+      SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            // Specchia le stesse identiche sfumature e comportamenti del televoto
+            backgroundColor: isCandidatureAperte ? const Color(0xFF221526) : const Color(0xFFD68BFF),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+              side: isCandidatureAperte 
+                  ? const BorderSide(color: Colors.redAccent, width: 1) 
+                  : BorderSide.none,
+            ),
+          ),
+          onPressed: () => _gestisciCandidature(isCandidatureAperte),
+          icon: Icon(
+            isCandidatureAperte ? Icons.block_outlined : Icons.assignment_turned_in_rounded, 
+            color: isCandidatureAperte ? Colors.redAccent : Colors.black,
+          ),
+          label: Text(
+            isCandidatureAperte ? "CHIUDI CANDIDATURE" : "APRI CANDIDATURE",
+            style: TextStyle(
+              color: isCandidatureAperte ? Colors.redAccent : Colors.black, 
+              fontWeight: FontWeight.bold, 
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+)
+
+
+
+
             ],
           ),
         );
@@ -307,32 +460,109 @@ class _EventAdminViewState extends State<EventAdminView> {
     );
   }
 
-  Future<void> _gestisciPubblicazioneClassifica(bool statoAttuale) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('eventi')
-          .doc(widget.eventId)
-          .update({
-        'isRankingPublished': !statoAttuale,
-      });
+void _gestisciCandidature(bool statoAttuale) async {
+  try {
+    await FirebaseFirestore.instance
+        .collection('eventi')
+        .doc(widget.eventId)
+        .update({
+          'isCandidatureAperte': !statoAttuale, // Inverte lo stato sul DB
+        });
+  } catch (e) {
+    print("Errore durante l'aggiornamento dello stato candidature: $e");
+  }
+}
 
+Future<void> _gestisciPubblicazioneClassifica(bool statoAttuale) async {
+  try {
+    // Invertiamo lo stato attuale della classifica
+    bool nuovoStato = !statoAttuale;
+
+    // Aggiorniamo il campo sul DB (usando 'isRankingPublished' come nel tuo StreamBuilder)
+    await FirebaseFirestore.instance
+        .collection('eventi')
+        .doc(widget.eventId)
+        .update({
+      'isRankingPublished': nuovoStato,
+    });
+
+    // Feedback visivo a schermo
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(statoAttuale ? "Classifica nascosta!" : "Classifica pubblicata con successo!"),
-          backgroundColor: statoAttuale ? Colors.orange : Colors.green,
+          content: Text(
+            nuovoStato 
+                ? "Classifica PUBBLICATA con successo!" 
+                : "Classifica NASCOSTA con successo!",
+          ),
+          backgroundColor: nuovoStato ? Colors.green : Colors.redAccent,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
         ),
       );
-    } catch (e) {
+    }
+  } catch (e) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Errore durante l'operazione: $e"),
+          content: Text("Errore durante l'aggiornamento della classifica: $e"),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
+}
+
+ 
+ 
+ 
+  
+ 
+// Sincronizzazione dello stato del televoto dal DB
+
+Future<void> _gestisciTelevoto(bool statoAttuale) async {
+  try {
+    // Invertiamo lo stato attuale: se è true diventa false, se è false diventa true
+    bool nuovoStato = !statoAttuale;
+
+    await FirebaseFirestore.instance
+        .collection('eventi')
+        .doc(widget.eventId)
+        .update({
+      'isTelevotoAperto': nuovoStato,
+    });
+
+    // Mostra un feedback all'utente dell'esito positivo
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nuovoStato 
+                ? "Televoto APERTO con successo!" 
+                : "Televoto CHIUSO con successo!",
+          ),
+          backgroundColor: nuovoStato ? Colors.green : Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  } catch (e) {
+    // Gestione di eventuali errori (es. problemi di connessione)
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Errore durante l'aggiornamento del televoto: $e"),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+}
+
+
 
   // --- SELETTORE DELLE PAGINE DEL CORPO ---
   Widget _buildBody() {

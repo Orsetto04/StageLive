@@ -396,361 +396,421 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     );
   }
 
-  // --- SCHERMATA VOTAZIONI LIVE (OTTIMIZZATA MULTI-CONCORRENTE) ---
   Widget _buildVotazioniLive() {
-    // AGGIUNTO: Se stiamo caricando i voti passati dal DB, mostra il caricamento per evitare sfarfallii
-    if (_isLoadingVoti) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
-    }
+  // Se stiamo caricando i voti passati dal DB, mostra il caricamento per evitare sfarfallii
+  if (_isLoadingVoti) {
+    return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+  }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('eventi')
-          .doc(widget.eventId)
-          .collection('concorrenti')
-          .orderBy('timestamp', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
-        }
+  // 1. ASCOLTIAMO LO STATO DEL TELEVOTO DALL'EVENTO PRINCIPALE
+  return StreamBuilder<DocumentSnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('eventi')
+        .doc(widget.eventId)
+        .snapshots(),
+    builder: (context, eventSnapshot) {
+      if (eventSnapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+      }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Text(
-              "Nessun concorrente disponibile per la votazione",
-              style: TextStyle(color: Colors.grey, fontSize: 15),
-            ),
-          );
-        }
+      var eventData = eventSnapshot.data?.data() as Map<String, dynamic>?;
+      // Leggiamo la stessa identica chiave usata lato Admin
+      bool isTelevotoAperto = eventData?['isTelevotoAperto'] ?? false;
 
-        final allDocs = snapshot.data!.docs;
-        final docs = allDocs.where((doc) => !_votedConcorrentiIds.contains(doc.id)).toList();
-
-        if (docs.isEmpty) {
-          return const Center(
-            child: Text(
-              "Hai già votato tutti i concorrenti disponibili!",
-              style: TextStyle(color: Colors.grey, fontSize: 15),
-            ),
-          );
-        }
-        
-        if (_currentArtistIndex >= docs.length) {
-          _currentArtistIndex = 0;
-        }
-
-        final artistDoc = docs[_currentArtistIndex];
-        final artistData = artistDoc.data() as Map<String, dynamic>;
-        final String artistId = artistDoc.id;
-        final String nomeArte = artistData['nomeArte'] ?? "Artista";
-        final String category = artistData['genere'] ?? "Categoria";
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "LIVE SHOW IN CORSO",
-                style: TextStyle(color: Color(0xFFFF7B93), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2),
-              ),
-              const SizedBox(height: 5),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Vota Ora!",
-                    style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+      // 🛑 SE IL TELEVOTO È CHIUSO: Mostriamo la schermata di blocco temporaneo
+      if (!isTelevotoAperto) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(30.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16161E),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white10),
                   ),
-                  if (docs.length > 1)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(10)),
-                      child: Text(
-                        "${_currentArtistIndex + 1} di ${docs.length}",
-                        style: const TextStyle(color: Color(0xFFD68BFF), fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 25),
-
-              Container(
-                width: double.infinity,
-                height: 340,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  color: const Color(0xFF16161E),
-                  image: const DecorationImage(
-                    image: NetworkImage('https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000'),
-                    fit: BoxFit.cover,
-                    opacity: 0.35,
+                  child: const Icon(
+                    Icons.how_to_vote_rounded,
+                    size: 50,
+                    color: Color(0xFFFF7B93), // Rosa acceso coerente con il tuo stile
                   ),
                 ),
-                child: Stack(
+                const SizedBox(height: 24),
+                const Text(
+                  "Televoto Chiuso",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "Le votazioni non sono attualmente attive.\nAttendi che l'amministratore apra il televoto per poter esprimere il tuo giudizio.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // ✅ SE IL TELEVOTO È APERTO: Carica regolarmente i concorrenti (Il tuo codice originale intatto)
+      return StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('eventi')
+            .doc(widget.eventId)
+            .collection('concorrenti')
+            .orderBy('timestamp', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text(
+                "Nessun concorrente disponibile per la votazione",
+                style: TextStyle(color: Colors.grey, fontSize: 15),
+              ),
+            );
+          }
+
+          final allDocs = snapshot.data!.docs;
+          final docs = allDocs.where((doc) => !_votedConcorrentiIds.contains(doc.id)).toList();
+
+          if (docs.isEmpty) {
+            return const Center(
+              child: Text(
+                "Hai già votato tutti i concorrenti disponibili!",
+                style: TextStyle(color: Colors.grey, fontSize: 15),
+              ),
+            );
+          }
+          
+          if (_currentArtistIndex >= docs.length) {
+            _currentArtistIndex = 0;
+          }
+
+          final artistDoc = docs[_currentArtistIndex];
+          final artistData = artistDoc.data() as Map<String, dynamic>;
+          final String artistId = artistDoc.id;
+          final String nomeArte = artistData['nomeArte'] ?? "Artista";
+          final String category = artistData['genere'] ?? "Categoria";
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "LIVE SHOW IN CORSO",
+                  style: TextStyle(color: Color(0xFFFF7B93), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2),
+                ),
+                const SizedBox(height: 5),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.black.withOpacity(0.9)],
-                        ),
-                      ),
+                    const Text(
+                      "Vota Ora!",
+                      style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
                     ),
-                    
-                    Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF8C1D40).withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFFF7B93), width: 0.5),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(color: Color(0xFFFF7B93), shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  "IN SCENA",
-                                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            nomeArte,
-                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            "Categoria: $category",
-                            style: const TextStyle(color: Colors.white60, fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    if (_currentArtistIndex > 0)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: CircleAvatar(
-                            backgroundColor: Colors.black54,
-                            child: IconButton(
-                              icon: const Icon(Icons.chevron_left, color: Colors.white),
-                              onPressed: () {
-                                setState(() {
-                                  _currentArtistIndex--;
-                                  _selectedVote = null;
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    if (_currentArtistIndex < docs.length - 1)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: CircleAvatar(
-                            backgroundColor: Colors.black54,
-                            child: IconButton(
-                              icon: const Icon(Icons.chevron_right, color: Colors.white),
-                              onPressed: () {
-                                setState(() {
-                                  _currentArtistIndex++;
-                                  _selectedVote = null;
-                                });
-                              },
-                            ),
-                          ),
+                    if (docs.length > 1)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: const Color(0xFF16161E), borderRadius: BorderRadius.circular(10)),
+                        child: Text(
+                          "${_currentArtistIndex + 1} di ${docs.length}",
+                          style: const TextStyle(color: Color(0xFFD68BFF), fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                       ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 35),
+                const SizedBox(height: 25),
 
-              const Center(
-                child: Text(
-                  "Come valuti questa performance?",
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Center(
-                child: Text(
-                  "Esprimi il tuo giudizio da 1 a 10.",
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
-                ),
-              ),
-              const SizedBox(height: 25),
-
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                alignment: WrapAlignment.center,
-                children: List.generate(10, (index) {
-                  int voteValue = index + 1;
-                  bool isSelected = _selectedVote == voteValue;
-
-                  return InkWell(
-                    onTap: () => setState(() => _selectedVote = voteValue),
-                    borderRadius: BorderRadius.circular(15),
-                    child: Container(
-                      width: (MediaQuery.of(context).size.width - 96) / 5,
-                      height: 55,
-                      decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFD68BFF) : const Color(0xFF16161E),
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: isSelected ? [
-                          BoxShadow(color: const Color(0xFFD68BFF).withOpacity(0.4), blurRadius: 12, spreadRadius: 2)
-                        ] : [],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        "$voteValue",
-                        style: TextStyle(
-                          color: isSelected ? Colors.black : Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 35),
-
-              InkWell(
-                onTap: _selectedVote == null ? null : () async {
-                  final String concorrenteId = artistId;
-                  final double votoScelto = _selectedVote!.toDouble();
-                  final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
-
-                  DocumentReference concorrenteRef = FirebaseFirestore.instance
-                      .collection('eventi') 
-                      .doc(widget.eventId)
-                      .collection('concorrenti')
-                      .doc(concorrenteId);
-
-                  // Riferimento al documento in cui salviamo la cronologia di voto dello spettatore per questo evento
-                  DocumentReference spettatoreVotiRef = FirebaseFirestore.instance
-                      .collection('eventi')
-                      .doc(widget.eventId)
-                      .collection('voti_spettatori')
-                      .doc(userId);
-
-                  try {
-                    // 1. Aggiorna i voti totali del concorrente
-                    await concorrenteRef.update({
-                      'totaleSommaVoti': FieldValue.increment(votoScelto),
-                      'numeroVoti': FieldValue.increment(1),
-                    });
-                    
-                    // 2. MODIFICATO / AGGIUNTO: Salva permanentemente l'ID del concorrente nel DB sotto il profilo dello spettatore
-                    await spettatoreVotiRef.set({
-                      'concorrentiVotati': FieldValue.arrayUnion([concorrenteId])
-                    }, SetOptions(merge: true));
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Voto inviato con successo! Classifica aggiornata.'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-
-                    setState(() {
-                      _votedConcorrentiIds.add(artistId); 
-                      _selectedIndex = 2; 
-                      _selectedVote = null;
-                    });
-
-                  } catch (e) {
-                    print("Errore immediato durante l'invio del voto: $e");
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Errore di scrittura: ${e.toString()}'),
-                          backgroundColor: Colors.redAccent,
-                        ),
-                      );
-                    }
-                  }
-                },
-                child: Container(
+                Container(
                   width: double.infinity,
-                  height: 55,
+                  height: 340,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    gradient: _selectedVote == null 
-                        ? null 
-                        : const LinearGradient(
-                            colors: [Color(0xFFD68BFF), Color(0xFFFF7B93)],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                    color: _selectedVote == null ? Colors.white10 : null,
+                    color: const Color(0xFF16161E),
+                    image: const DecorationImage(
+                      image: NetworkImage('https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000'),
+                      fit: BoxFit.cover,
+                      opacity: 0.35,
+                    ),
                   ),
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Stack(
                     children: [
-                      Text(
-                        "Invia il tuo Voto",
-                        style: TextStyle(
-                          color: _selectedVote == null ? Colors.white38 : Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(30),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black.withOpacity(0.9)],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Icon(
-                        Icons.send,
-                        size: 18,
-                        color: _selectedVote == null ? Colors.white38 : Colors.black,
+                      
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8C1D40).withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFFF7B93), width: 0.5),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(color: Color(0xFFFF7B93), shape: BoxShape.circle),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    "IN SCENA",
+                                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              nomeArte,
+                              style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              "Categoria: $category",
+                              style: const TextStyle(color: Colors.white60, fontSize: 14),
+                            ),
+                          ],
+                        ),
                       ),
+
+                      if (_currentArtistIndex > 0)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: CircleAvatar(
+                              backgroundColor: Colors.black54,
+                              child: IconButton(
+                                icon: const Icon(Icons.chevron_left, color: Colors.white),
+                                onPressed: () {
+                                  setState(() {
+                                    _currentArtistIndex--;
+                                    _selectedVote = null;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      if (_currentArtistIndex < docs.length - 1)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: CircleAvatar(
+                              backgroundColor: Colors.black54,
+                              child: IconButton(
+                                icon: const Icon(Icons.chevron_right, color: Colors.white),
+                                onPressed: () {
+                                  setState(() {
+                                    _currentArtistIndex++;
+                                    _selectedVote = null;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 40),
-              
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: const LinearProgressIndicator(
-                  value: 0.84,
-                  backgroundColor: Colors.white10,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4E2C60)),
-                  minHeight: 4,
+                const SizedBox(height: 35),
+
+                const Center(
+                  child: Text(
+                    "Come valuti questa performance?",
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+                const SizedBox(height: 4),
+                const Center(
+                  child: Text(
+                    "Esprimi il tuo giudizio da 1 a 10.",
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ),
+                const SizedBox(height: 25),
+
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.center,
+                  children: List.generate(10, (index) {
+                    int voteValue = index + 1;
+                    bool isSelected = _selectedVote == voteValue;
+
+                    return InkWell(
+                      onTap: () => setState(() => _selectedVote = voteValue),
+                      borderRadius: BorderRadius.circular(15),
+                      child: Container(
+                        width: (MediaQuery.of(context).size.width - 96) / 5,
+                        height: 55,
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFD68BFF) : const Color(0xFF16161E),
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: isSelected ? [
+                            BoxShadow(color: const Color(0xFFD68BFF).withOpacity(0.4), blurRadius: 12, spreadRadius: 2)
+                          ] : [],
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          "$voteValue",
+                          style: TextStyle(
+                            color: isSelected ? Colors.black : Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 35),
+
+                InkWell(
+                  onTap: _selectedVote == null ? null : () async {
+                    final String concorrenteId = artistId;
+                    final double votoScelto = _selectedVote!.toDouble();
+                    final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
+
+                    DocumentReference concorrenteRef = FirebaseFirestore.instance
+                        .collection('eventi') 
+                        .doc(widget.eventId)
+                        .collection('concorrenti')
+                        .doc(concorrenteId);
+
+                    DocumentReference spettatoreVotiRef = FirebaseFirestore.instance
+                        .collection('eventi')
+                        .doc(widget.eventId)
+                        .collection('voti_spettatori')
+                        .doc(userId);
+
+                    try {
+                      await concorrenteRef.update({
+                        'totaleSommaVoti': FieldValue.increment(votoScelto),
+                        'numeroVoti': FieldValue.increment(1),
+                      });
+                      
+                      await spettatoreVotiRef.set({
+                        'concorrentiVotati': FieldValue.arrayUnion([concorrenteId])
+                      }, SetOptions(merge: true));
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Voto inviato con successo! Classifica aggiornata.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+
+                      setState(() {
+                        _votedConcorrentiIds.add(artistId); 
+                        _selectedIndex = 2; 
+                        _selectedVote = null;
+                      });
+
+                    } catch (e) {
+                      print("Errore immediato durante l'invio del voto: $e");
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Errore di scrittura: ${e.toString()}'),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    height: 55,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      gradient: _selectedVote == null 
+                          ? null 
+                          : const LinearGradient(
+                              colors: [Color(0xFFD68BFF), Color(0xFFFF7B93)],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                      color: _selectedVote == null ? Colors.white10 : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Invia il tuo Voto",
+                          style: TextStyle(
+                            color: _selectedVote == null ? Colors.white38 : Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Icon(
+                          Icons.send,
+                          size: 18,
+                          color: _selectedVote == null ? Colors.white38 : Colors.black,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: const LinearProgressIndicator(
+                    value: 0.84,
+                    backgroundColor: Colors.white10,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4E2C60)),
+                    minHeight: 4,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
  
 

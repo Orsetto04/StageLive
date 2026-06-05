@@ -285,8 +285,7 @@ class _ScalettaLiveViewState extends State<ScalettaLiveView> {
     );
   }
 
-  // --- LOGICHE DI MODIFICA ---
-  void _showAddPerformanceDialog(BuildContext context) {
+void _showAddPerformanceDialog(BuildContext context) {
     if (!_canModify) return; // Sicurezza extra
     String? utenteSelezionatoUid;
     String? utenteSelezionatoNome;
@@ -390,14 +389,14 @@ class _ScalettaLiveViewState extends State<ScalettaLiveView> {
                             .doc(widget.eventId)
                             .collection('scaletta')
                             .add({
-                              'uid': utenteSelezionatoUid,
-                              'nomeArte': utenteSelezionatoNome,
-                              'brano': branoController.text.trim(),
-                              'genere': genereController.text.trim(),
-                              'durata': durataController.text.trim(),
-                              'status': 'IN ATTESA',
-                              'ordine': nuovoOrdine,
-                            });
+                          'uid': utenteSelezionatoUid,
+                          'nomeArte': utenteSelezionatoNome,
+                          'brano': branoController.text.trim(),
+                          'genere': genereController.text.trim(),
+                          'durata': durataController.text.trim(),
+                          'status': 'IN ATTESA',
+                          'ordine': nuovoOrdine,
+                        });
 
                         if (context.mounted) Navigator.pop(context);
                       },
@@ -413,7 +412,6 @@ class _ScalettaLiveViewState extends State<ScalettaLiveView> {
       },
     );
   }
-
   void _gestisciModificaPerformance(String docId, String azione, Map<String, dynamic> data) async {
     if (!_canModify) return;
     var ref = FirebaseFirestore.instance.collection('eventi').doc(widget.eventId).collection('scaletta').doc(docId);
