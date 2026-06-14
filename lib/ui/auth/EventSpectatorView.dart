@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // AGGIUNTO: Per identificare lo spettatore unico
+import 'package:firebase_auth/firebase_auth.dart'; 
 import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
 import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
 
@@ -22,17 +22,15 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
   int? _selectedVote;
   int _currentArtistIndex = 0; 
 
-  // AGGIUNTI PER LA PERSISTENZA DIRETTA SU FIRESTORE
   bool _isLoadingVoti = true; // Evita il flash della lista prima del caricamento dei vecchi voti
   final List<String> _votedConcorrentiIds = [];
 
   @override
   void initState() {
     super.initState();
-    _caricaVotiPrecedenti(); // AGGIUNTO: Carica i voti salvati nel DB appena si apre la schermata
+    _caricaVotiPrecedenti(); 
   }
 
-  // AGGIUNTO: Recupera la lista dei concorrenti già votati da Firestore
   Future<void> _caricaVotiPrecedenti() async {
     try {
       final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
@@ -60,7 +58,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     }
   }
 
-  // --- SCHERMATA SCALETTA LIVE ---
   Widget _buildScalettaLive() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -102,9 +99,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
     );
   }
 
-  // =========================================================================
-  // SCHERMATA CLASSIFICA LIVE COLLEGATA A FIREBASE FIRESTORE (In tempo reale)
-  // =========================================================================
   Widget _buildClassificaLive() {
     const Color localPurple = Color(0xFFBC53EE);
     const Color localPink = Color(0xFFFA6A7F);
@@ -274,9 +268,9 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                           shadowColor: Colors.transparent,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             Icon(Icons.assignment_return_outlined, color: Colors.black, size: 20),
                             SizedBox(width: 10),
                             Text('TORNA ALLA VOTAZIONE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.5)),
@@ -463,7 +457,6 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
         );
       }
 
-      // ✅ SE IL TELEVOTO È APERTO: Carica regolarmente i concorrenti (Il tuo codice originale intatto)
       return StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('eventi')
@@ -673,6 +666,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                     bool isSelected = _selectedVote == voteValue;
 
                     return InkWell(
+                      key: Key('bottone-voto-$voteValue'),
                       onTap: () => setState(() => _selectedVote = voteValue),
                       borderRadius: BorderRadius.circular(15),
                       child: Container(
@@ -701,6 +695,7 @@ class _EventSpectatorViewState extends State<EventSpectatorView> {
                 const SizedBox(height: 35),
 
                 InkWell(
+                  key: const Key('bottone-invia-voto'),
                   onTap: _selectedVote == null ? null : () async {
                     final String concorrenteId = artistId;
                     final double votoScelto = _selectedVote!.toDouble();
@@ -828,7 +823,6 @@ Widget _buildProfiloSpettatore(BuildContext context, {
     padding: const EdgeInsets.all(30),
     child: Column(
       children: [
-        // 🌟 Card Profilo dello Spettatore (Stile speculare a quello Admin)
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 25),
@@ -849,7 +843,6 @@ Widget _buildProfiloSpettatore(BuildContext context, {
               
              
               
-              // Badge "SPETTATORE" (Stile "PROPRIETARIO EVENTO" della foto)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 decoration: BoxDecoration(
@@ -876,10 +869,8 @@ Widget _buildProfiloSpettatore(BuildContext context, {
 
 
 
-// Helper interno per generare le singole colonne delle statistiche
 
 
-// Helper interno per generare i chip/tag grafici degli interessi
 Widget _buildTag(String text, TextStyle baseStyle) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -898,9 +889,6 @@ Widget _buildTag(String text, TextStyle baseStyle) {
   );
 }
 
-// =========================================================================
-  // METODO PRINCIPALE BUILD (RISOLVE L'ERRORE DELLA MANCANZA DI BUILD)
-  // =========================================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(

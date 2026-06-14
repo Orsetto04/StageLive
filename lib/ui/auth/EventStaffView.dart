@@ -32,17 +32,15 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
     @override
   void initState() {
     super.initState();
-    _controllaAccessoAutomatico(); // 🌟 Avvia il controllo appena si apre la pagina
+    _controllaAccessoAutomatico(); 
     _isAccessGranted = widget.inizialmenteAutorizzato;
   }
 
-  // 🌟 Nuova funzione per verificare se lo staff è già registrato ed autorizzato
   Future<void> _controllaAccessoAutomatico() async {
     try {
       final String? myUid = AuthService().currentUid; // Recupera l'UID (usa il tuo metodo o FirebaseAuth)
       
       if (myUid != null) {
-        // Cerchiamo se esiste già il documento di questo utente per questo evento
         var doc = await FirebaseFirestore.instance
             .collection('staff')
             .doc('${myUid}_${widget.eventId}')
@@ -61,25 +59,21 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
     } catch (e) {
       print("Errore durante il controllo automatico dello staff: $e");
     } finally {
-      // In ogni caso (sia che abbia accesso o no), fermiamo il caricamento iniziale
       setState(() {
         _isLoading = false;
       });
     }
   }
 
-  // Funzione per verificare se il codice inserito corrisponde a quello impostato dall'admin
   void _verificaCodiceStaff() async {
     String codiceInserito = _codeController.text.trim();
     if (codiceInserito.isEmpty) return;
 
-    // (Opzionale) Mostra un indicatore di caricamento se lo hai definito
     setState(() {
       _isLoading = true; 
     });
 
     try {
-      // 1. Leggiamo il documento dell'evento per prendere il codice UNICO generato dall'admin
       var eventDoc = await FirebaseFirestore.instance
           .collection('eventi')
           .doc(widget.eventId) // ID dell'evento corrente
@@ -88,15 +82,13 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
       if (eventDoc.exists) {
         var eventData = eventDoc.data() as Map<String, dynamic>;
         
-        // 🌟 NOTA: Controlla su Firestore come hai chiamato il campo del codice. 
         // Se nel database l'hai chiamato 'staffCode' o 'codice', modifica la riga qui sotto:
         String? codiceReale = eventData['staffCode']?.toString(); 
 
         // 2. Confrontiamo il codice inserito dall'utente con quello unico dell'evento
         if (codiceReale != null && codiceReale == codiceInserito) {
           
-          // Il codice è corretto! Ora inseriamo l'utente corrente nella sottocollezione staff
-          final String? myUid = AuthService().currentUid; // o FirebaseAuth.instance.currentUser?.uid
+          final String? myUid = AuthService().currentUid; 
           
           if (myUid != null) {
             await FirebaseFirestore.instance
@@ -111,7 +103,6 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
                   'createdAt': FieldValue.serverTimestamp(),
                 });
 
-            // Sblocchiamo la visualizzazione della dashboard
             setState(() {
               _isAccessGranted = true;
             });
@@ -345,8 +336,7 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
     );
   }
 
-  // 2. LISTA CONCORRENTI
- // 2. LISTA CONCORRENTI AGGIORNATA (Cliccabile con vista dettagli)
+ // 2. LISTA CONCORRENTI  
   Widget _buildListaConcorrentiView() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -405,7 +395,6 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
     );
   }
 
-  // 🌟 FUNZIONE DI SUPPORTO: Mostra il BottomSheet con tutti i dettagli della candidatura
   void _mostraDettagliConcorrente(BuildContext context, Map<String, dynamic> data) {
     showModalBottomSheet(
       context: context,
@@ -518,7 +507,6 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
     );
   }
 
-  // Widget riutilizzabile per formattare le righe chiave-valore nel popup dei dettagli
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -546,7 +534,6 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
     padding: const EdgeInsets.all(30),
     child: Column(
       children: [
-        // 🛠️ Card Profilo dello Staff
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 25),
@@ -557,7 +544,6 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
           ),
           child: Column(
             children: [
-              // Icona Badge/Pass Identificativo dello Staff
               const Icon(
                 Icons.badge_rounded, 
                 size: 80, 
@@ -566,7 +552,6 @@ class _EventStaffDashboardState extends State<EventStaffDashboard> {
               const SizedBox(height: 20),
              
               
-              // Badge "STAFF"
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 decoration: BoxDecoration(

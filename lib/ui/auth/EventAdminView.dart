@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Abilita l'uso della Clipboard (Appunti)
+import 'package:flutter/services.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
 import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
@@ -18,7 +18,7 @@ class EventAdminView extends StatefulWidget {
 class _EventAdminViewState extends State<EventAdminView> {
   int _selectedIndex = 1; // Default su Candidature
 
-  // --- FUNZIONI PER IL CODICE STAFF ---
+  
   
   // Genera un codice casuale alfanumerico di 6 caratteri
   String _generateRandomCode() {
@@ -58,7 +58,6 @@ class _EventAdminViewState extends State<EventAdminView> {
     }
   }
 
-  // --- SCHERMATA 1: LISTA DELLE CANDIDATURE PENDENTI (AGGIORNATA CON ESPANSIONE DI PIÙ) ---
   Widget _buildCandidatureList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -85,7 +84,6 @@ class _EventAdminViewState extends State<EventAdminView> {
             var data = docs[index].data() as Map<String, dynamic>;
             String docId = docs[index].id;
 
-            // Utilizziamo il nuovo widget card personalizzato che gestisce l'apertura a clic
             return _CandidaturaItemCard(
               data: data,
               docId: docId,
@@ -121,7 +119,6 @@ class _EventAdminViewState extends State<EventAdminView> {
           padding: const EdgeInsets.all(30),
           child: Column(
             children: [
-              // Card Profilo principale dell'Admin
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(25),
@@ -243,7 +240,6 @@ class _EventAdminViewState extends State<EventAdminView> {
               ),
               const SizedBox(height: 25),
 
-              // 🔥 NUOVA SEZIONE: Gestione Pubblicazione Classifica
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(25),
@@ -311,7 +307,6 @@ class _EventAdminViewState extends State<EventAdminView> {
 
            
         
-             // 🔥 SEZIONE: Gestione Televoto (Cambia dinamicamente come la classifica!)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(25),
@@ -360,12 +355,10 @@ class _EventAdminViewState extends State<EventAdminView> {
                         ),
                         onPressed: () => _gestisciTelevoto(isTelevotoAperto),
                         icon: Icon(
-                          // Cambia anche l'icona in base allo stato
                           isTelevotoAperto ? Icons.gavel_outlined : Icons.how_to_vote, 
                           color: isTelevotoAperto ? Colors.redAccent : Colors.black,
                         ),
                         label: Text(
-                          // Cambia il testo del pulsante in base allo stato
                           isTelevotoAperto ? "STOP AL TELEVOTO" : "APRI IL TELEVOTO",
                           style: TextStyle(
                             color: isTelevotoAperto ? Colors.redAccent : Colors.black, 
@@ -475,10 +468,8 @@ void _gestisciCandidature(bool statoAttuale) async {
 
 Future<void> _gestisciPubblicazioneClassifica(bool statoAttuale) async {
   try {
-    // Invertiamo lo stato attuale della classifica
     bool nuovoStato = !statoAttuale;
 
-    // Aggiorniamo il campo sul DB (usando 'isRankingPublished' come nel tuo StreamBuilder)
     await FirebaseFirestore.instance
         .collection('eventi')
         .doc(widget.eventId)
@@ -486,7 +477,6 @@ Future<void> _gestisciPubblicazioneClassifica(bool statoAttuale) async {
       'isRankingPublished': nuovoStato,
     });
 
-    // Feedback visivo a schermo
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -519,7 +509,6 @@ Future<void> _gestisciPubblicazioneClassifica(bool statoAttuale) async {
  
   
  
-// Sincronizzazione dello stato del televoto dal DB
 
 Future<void> _gestisciTelevoto(bool statoAttuale) async {
   try {
@@ -533,7 +522,6 @@ Future<void> _gestisciTelevoto(bool statoAttuale) async {
       'isTelevotoAperto': nuovoStato,
     });
 
-    // Mostra un feedback all'utente dell'esito positivo
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -549,7 +537,6 @@ Future<void> _gestisciTelevoto(bool statoAttuale) async {
       );
     }
   } catch (e) {
-    // Gestione di eventuali errori (es. problemi di connessione)
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -564,7 +551,6 @@ Future<void> _gestisciTelevoto(bool statoAttuale) async {
 
 
 
-  // --- SELETTORE DELLE PAGINE DEL CORPO ---
   Widget _buildBody() {
     switch (_selectedIndex) {
       case 0:
@@ -616,9 +602,6 @@ Future<void> _gestisciTelevoto(bool statoAttuale) async {
   }
 }
 
-// =========================================================================
-// WIDGET CARD SEPARATO: GESTISCE L'ESPANSIONE FLUIDA AI DETTAGLI AL CLIC
-// =========================================================================
 class _CandidaturaItemCard extends StatefulWidget {
   final Map<String, dynamic> data;
   final String docId;
@@ -691,9 +674,8 @@ class _CandidaturaItemCardState extends State<_CandidaturaItemCard> {
               ],
             ),
 
-            // ==========================================
-            // SEZIONE DETTAGLI: APPARE SOLO SE ESPANSO
-            // ==========================================
+
+
             if (_isExpanded) ...[
               const Divider(color: Colors.white10, height: 25),
               
@@ -708,7 +690,6 @@ class _CandidaturaItemCardState extends State<_CandidaturaItemCard> {
                 const SizedBox(height: 15),
               ],
 
-              // 📇 Sezione Dati Anagrafici completi presi dal DB della candidatura
               const Row(
                 children: [
                   Icon(Icons.badge_outlined, color: Color(0xFFD68BFF), size: 16),
@@ -729,7 +710,6 @@ class _CandidaturaItemCardState extends State<_CandidaturaItemCard> {
                 _buildAnagraficaRow("Età:", "${data['eta']} anni"),
               _buildAnagraficaRow("Brano Scelto:", data['brano'] ?? "Non specificato"),
 
-              // 🌐 Link Social (Instagram / TikTok)
               if ((data['instagram'] != null && data['instagram'].toString().isNotEmpty) || 
                   (data['tiktok'] != null && data['tiktok'].toString().isNotEmpty)) ...[
                 const SizedBox(height: 15),

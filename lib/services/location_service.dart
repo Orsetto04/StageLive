@@ -6,7 +6,6 @@ class LocationService {
   static const String _apiProvince = "https://comuni-ita.herokuapp.com/api/province";
   static const String _apiComuni = "https://comuni-ita.herokuapp.com/api/comuni/provincia/";
 
-  // Carica le province (solo una volta, sono poche, circa 107)
   Future<List<String>> getProvince() async {
   try {
     final response = await http.get(Uri.parse(_apiProvince)).timeout(const Duration(seconds: 5));
@@ -18,11 +17,9 @@ class LocationService {
     print("Internet non risponde, carico province di emergenza...");
   }
   
-  // SE INTERNET FALLISCE, RITORNA ALMENO QUESTE (Lista di emergenza)
   return ["Agrigento", "Bari", "Bologna", "Catania", "Firenze", "Genova", "Milano", "Napoli", "Palermo", "Roma", "Teramo", "Torino", "Venezia"];
 }
 
-  // Carica i comuni solo per la provincia selezionata
  Future<List<String>> getComuniPerProvincia(String provincia) async {
   try {
     
@@ -47,7 +44,6 @@ class LocationService {
     print("Errore durante il caricamento dei comuni: $e");
   }
   
-  // Lista di emergenza se la provincia è Teramo (come test)
   if (provincia.contains("Teramo")) {
     return ["Teramo", "Giulianova", "Roseto degli Abruzzi", "Bellante", "Atri"];
   }

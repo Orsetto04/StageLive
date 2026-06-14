@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stagelive/services/auth_service.dart';
 import 'EventAdminView.dart';
-import 'EventCompetitorView.dart'; // 🌟 Leggerà EventCompetitorDashboard direttamente da qui!
+import 'EventCompetitorView.dart'; 
 import 'EventSpectatorView.dart';
 import 'EventStaffView.dart'; 
 
@@ -50,7 +50,6 @@ class _EventsViewState extends State<EventsView> {
     final String? myUid = _auth.currentUid;
     if (myUid == null) return; 
 
-    // 👑 CONTROLLO ADMIN: Se l'utente è il proprietario dell'evento, entra diretto!
     if (myUid == adminId) {
       if (mounted) {
         Navigator.push(
@@ -239,7 +238,6 @@ class _EventsViewState extends State<EventsView> {
               }),
               const SizedBox(height: 15),
               
-              // 🔥 MODIFICATO: Controllo dinamico dello stato delle candidature prima dell'accesso
               _roleButton(context, "Candidati come Concorrente", Icons.mic, const Color(0xFFD68BFF), () async {
                 try {
                   // Recuperiamo il documento dell'evento in tempo reale al clic
@@ -272,7 +270,6 @@ class _EventsViewState extends State<EventsView> {
     );
   }
 
-  // 🛑 NUOVA SCHERMATA: Mostra l'avviso grafico quando le candidature sono bloccate
   void _showCandidatureChiuseBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,

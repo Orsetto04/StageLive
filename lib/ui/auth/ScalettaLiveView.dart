@@ -4,13 +4,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class ScalettaLiveView extends StatefulWidget {
   final String eventId;
   final String eventTitle;
-  final String ruolo; // 🌟 Può essere 'admin', 'staff', 'pubblico' o 'concorrente'
+  final String ruolo; 
+  
+  final bool isTestMode;
+  final List<Map<String, dynamic>>? testData;
 
   const ScalettaLiveView({
     super.key, 
     required this.eventId, 
     required this.eventTitle, 
     required this.ruolo, 
+    this.isTestMode = false, 
+    this.testData,           
   });
 
   @override
@@ -21,7 +26,6 @@ class _ScalettaLiveViewState extends State<ScalettaLiveView> {
   List<DocumentSnapshot> _localScaletta = [];
   bool _isOrderChanged = false;
   
-  // 🌟 AGGIORNATO: Sia l'Admin che lo Staff hanno i permessi di modifica della scaletta
   bool get _canModify => widget.ruolo == 'admin' || widget.ruolo == 'staff';
 
   @override
@@ -32,7 +36,6 @@ class _ScalettaLiveViewState extends State<ScalettaLiveView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- HEADER (Stile Screenshot) ---
             Padding(
               padding: const EdgeInsets.only(left: 25, right: 25, top: 20),
               child: Column(
@@ -76,64 +79,70 @@ class _ScalettaLiveViewState extends State<ScalettaLiveView> {
             ),
             const SizedBox(height: 20),
 
-            // --- LISTA DELLA SCALETTA (IN TEMPO REALE) ---
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('eventi')
-                    .doc(widget.eventId)
-                    .collection('scaletta')
-                    .orderBy('ordine')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
-                  
-                  if (!_isOrderChanged || !_canModify) {
-                    _localScaletta = snapshot.data!.docs;
-                  }
-
-                  if (_localScaletta.isEmpty) {
-                    return const Center(child: Text("Nessuna performance in scaletta", style: TextStyle(color: Colors.grey)));
-                  }
-
-                  // 🌟 SE È ADMIN O STAFF: Può riordinare tramite Drag & Drop
-                  if (_canModify) {
-                    return ReorderableListView.builder(
+              child: widget.isTestMode && widget.testData != null
+                  ? ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _localScaletta.length,
-                      onReorder: (oldIndex, newIndex) {
-                        setState(() {
-                          if (newIndex > oldIndex) newIndex -= 1;
-                          final item = _localScaletta.removeAt(oldIndex);
-                          _localScaletta.insert(newIndex, item);
-                          _isOrderChanged = true;
-                        });
-                      },
+                      itemCount: widget.testData!.length,
                       itemBuilder: (context, index) {
-                        var doc = _localScaletta[index];
-                        var data = doc.data() as Map<String, dynamic>;
-                        return _buildScalettaCard(doc.id, data, index, key: ValueKey(doc.id));
+                        var data = widget.testData![index];
+                        String docId = data['id'] ?? 'test_id_$index';
+                        return _buildScalettaCard(docId, data, index, key: ValueKey(docId));
                       },
-                    );
-                  } 
-                  
-                  // 🌟 SE È PUBBLICO/CONCORRENTE: Vede solo la lista bloccata
-                  else {
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _localScaletta.length,
-                      itemBuilder: (context, index) {
-                        var doc = _localScaletta[index];
-                        var data = doc.data() as Map<String, dynamic>;
-                        return _buildScalettaCard(doc.id, data, index, key: ValueKey(doc.id));
+                    )
+                  : StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('eventi')
+                          .doc(widget.eventId)
+                          .collection('scaletta')
+                          .orderBy('ordine')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFD68BFF)));
+                        
+                        if (!_isOrderChanged || !_canModify) {
+                          _localScaletta = snapshot.data!.docs;
+                        }
+
+                        if (_localScaletta.isEmpty) {
+                          return const Center(child: Text("Nessuna performance in scaletta", style: TextStyle(color: Colors.grey)));
+                        }
+
+                        if (_canModify) {
+                          return ReorderableListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: _localScaletta.length,
+                            onReorder: (oldIndex, newIndex) {
+                              setState(() {
+                                if (newIndex > oldIndex) newIndex -= 1;
+                                final item = _localScaletta.removeAt(oldIndex);
+                                _localScaletta.insert(newIndex, item);
+                                _isOrderChanged = true;
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              var doc = _localScaletta[index];
+                              var data = doc.data() as Map<String, dynamic>;
+                              return _buildScalettaCard(doc.id, data, index, key: ValueKey(doc.id));
+                            },
+                          );
+                        } 
+                        
+                        else {
+                          return ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: _localScaletta.length,
+                            itemBuilder: (context, index) {
+                              var doc = _localScaletta[index];
+                              var data = doc.data() as Map<String, dynamic>;
+                              return _buildScalettaCard(doc.id, data, index, key: ValueKey(doc.id));
+                            },
+                          );
+                        }
                       },
-                    );
-                  }
-                },
-              ),
+                    ),
             ),
 
-            // --- AZIONI IN BASSO (SOLO PER ADMIN E STAFF) ---
             if (_canModify)
               Padding(
                 padding: const EdgeInsets.all(25),
@@ -158,7 +167,6 @@ class _ScalettaLiveViewState extends State<ScalettaLiveView> {
     );
   }
 
-  // --- COSTRUZIONE DELLA CARD ---
   Widget _buildScalettaCard(String id, Map<String, dynamic> data, int index, {required Key key}) {
     String nome = data['nomeArte'] ?? data['nome'] ?? 'Artista';
     String brano = data['brano'] ?? 'Traccia';
@@ -423,25 +431,6 @@ void _showAddPerformanceDialog(BuildContext context) {
     }
   }
 
-  void _salvaNuovoOrdine() async {
-    if (!_canModify) return;
-    var batch = FirebaseFirestore.instance.batch();
-    for (int i = 0; i < _localScaletta.length; i++) {
-      var ref = FirebaseFirestore.instance
-          .collection('eventi')
-          .doc(widget.eventId)
-          .collection('scaletta')
-          .doc(_localScaletta[i].id);
-      batch.update(ref, {'ordine': i});
-    }
-    await batch.commit();
-    setState(() {
-      _isOrderChanged = false;
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Nuovo ordine scaletta salvato!"), backgroundColor: Colors.green));
-    }
-  }
 
   void _riassestaOrdiniDatabase() async {
     var snap = await FirebaseFirestore.instance.collection('eventi').doc(widget.eventId).collection('scaletta').orderBy('ordine').get();

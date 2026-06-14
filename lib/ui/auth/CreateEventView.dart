@@ -92,7 +92,6 @@ class _CreateEventViewState extends State<CreateEventView> {
                         if (val.isEmpty) {
                           filtrati = [];
                         } else {
-                          // Filtro dinamico per non bloccare l'interfaccia
                           filtrati = items
                               .where((element) => element.toLowerCase().startsWith(val.toLowerCase()))
                               .toList();

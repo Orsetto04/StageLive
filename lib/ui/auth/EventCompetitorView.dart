@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:stagelive/ui/auth/ClassificaLiveView.dart';
 import 'package:stagelive/ui/auth/ScalettaLiveView.dart';
-// NOTA: Importa il file in cui si trova il WaitingScreen (es. 'events_view.dart')
 import 'EventsView.dart'; 
 
 class EventCompetitorView extends StatefulWidget {
-  // MODIFICATO: Riceve l'id dell'evento specifico per legare la candidatura
   final String eventId;
 
   const EventCompetitorView({super.key, required this.eventId});
@@ -18,7 +15,6 @@ class EventCompetitorView extends StatefulWidget {
 }
 
 class _EventCompetitorViewState extends State<EventCompetitorView> {
-  // --- CONTROLLER ---
   final TextEditingController _nomeArteController = TextEditingController();
   final TextEditingController _descrizioneController = TextEditingController();
   final TextEditingController _nomeController = TextEditingController();
@@ -29,20 +25,16 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
   final TextEditingController _luogoController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _branoController = TextEditingController();
-  // Controller Social (Facoltativi)
   final TextEditingController _instagramController = TextEditingController();
   final TextEditingController _tiktokController = TextEditingController();
   final TextEditingController _facebookController = TextEditingController();
 
   String? _selectedGenre;
-  String? _cfError;
   bool _isSending = false;
 
   final List<String> _generi = ['Pop', 'Rock', 'Trap', 'Indie', 'Rap', 'Electronic', 'Jazz', 'Blues', 'Metal'];
 
-  // --- LOGICA INVIO ---
   Future<void> _inviaCandidatura() async {
-    // Controllo campi obbligatori
     if (_nomeArteController.text.isEmpty || 
         _selectedGenre == null || 
         _nomeController.text.isEmpty || 
@@ -89,7 +81,6 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
           const SnackBar(content: Text("Candidatura inviata con successo!"), backgroundColor: Colors.green)
         );
         
-        // MODIFICATO: Sostituisce la schermata attuale portando l'utente direttamente alla pagina di attesa
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const WaitingScreen()),
@@ -135,12 +126,7 @@ class _EventCompetitorViewState extends State<EventCompetitorView> {
             _buildCardContainer("Dati Anagrafici *", Icons.badge, [
               _buildInput("NOME *", "", _nomeController),
               _buildInput("COGNOME *", "", _cognomeController),
-              _buildInput("DATA DI NASCITA (GG/MM/AAAA)", "Es. 31/12/1999", _dateController, onChanged: (v) {
-                
-                  DateFormat('dd/MM/yyyy').parseStrict(v);
-                  
-                
-              }),
+              _buildInput("DATA DI NASCITA (GG/MM/AAAA)", "Es. 31/12/1999", _dateController),
               _buildInput("LUOGO DI NASCITA", "", _luogoController),
               _buildInput("EMAIL *", "es. tuo@email.com", _emailController),
               _buildInput("TELEFONO *", "Es. +39 123 456 7890", _telefonoController),
@@ -277,7 +263,6 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     );
   }
 
-  // 🌟 VISTA LISTA CONCORRENTI AGGIORNATA (Cliccabile per visualizzare SOLO il brano)
   Widget _buildListaConcorrentiView() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -333,7 +318,6 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
     );
   }
 
-  // 🌟 FUNZIONE DI SUPPORTO: Mostra un BottomSheet minimale con il SOLO brano del concorrente
   void _mostraBranoConcorrente(BuildContext context, String nome, String brano) {
     showModalBottomSheet(
       context: context,
@@ -433,7 +417,6 @@ class _EventCompetitorDashboardState extends State<EventCompetitorDashboard> {
       padding: const EdgeInsets.all(30),
       child: Column(
         children: [
-          // 🌟 Card Profilo del Concorrente
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 25),

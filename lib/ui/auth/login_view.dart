@@ -43,7 +43,6 @@ await _auth.loginUtente(
     }
   }
 
-  // Funzione per mostrare label di successo o errore
   void _showFeedback(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

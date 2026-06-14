@@ -3,20 +3,46 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart'; // Import per Clipboard se serve nel resto dell'app
 
 class ClassificaLiveView extends StatelessWidget {
+  final bool isTestMode;
+  final List<Map<String, String>>? testData;
   final String eventId;
-  final String userRole; // 👈 NUOVO: Passa il ruolo ('admin', 'staff', 'concorrente', 'spettatore')
+  final String userRole;
   final VoidCallback? onBackToVoting; 
 
   const ClassificaLiveView({
     super.key,
     required this.eventId,
-    required this.userRole, // 👈 NUOVO
+    required this.userRole, 
     this.onBackToVoting, 
     required String eventTitle,
+    this.isTestMode = false, 
+    this.testData,
   });
 
   @override
   Widget build(BuildContext context) {
+
+    if (isTestMode && testData != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF1E1B28), // Metti il colore di sfondo del tuo layout
+        body: ListView.builder(
+          itemCount: testData!.length,
+          itemBuilder: (context, index) {
+            final item = testData![index];
+            // Richiama il tuo metodo _buildListRow che abbiamo configurato prima!
+            return _buildListRow(
+              item['rank'] ?? '',
+              item['name'] ?? '',
+              item['category'] ?? '',
+              item['vote'] ?? '',
+              item['imageUrl'] ?? '',
+            );
+          },
+        ),
+      );
+    }
+
+
     const Color localPurple = Color(0xFFBC53EE);
     const Color localPink = Color(0xFFFA6A7F);
     const Color localMutedText = Colors.white54;
@@ -145,7 +171,6 @@ class ClassificaLiveView extends StatelessWidget {
                   ),
                   const SizedBox(height: 35),
 
-                  // --- IL PODIO DINAMICO (#2, #1, #3) ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -305,6 +330,7 @@ class ClassificaLiveView extends StatelessWidget {
 
   Widget _buildListRow(String rank, String name, String category, String vote, String imageUrl) {
     return Padding(
+      key: Key('riga_classifica_$rank'),
       padding: const EdgeInsets.symmetric(vertical: 11.0),
       child: Row(
         children: [
